@@ -372,8 +372,34 @@ namespace ImageApp
         {
             // create the filter
             float[,] filter = new float[size, size];
+            const float pi = (float)Math.PI;
+            const float E = (float)Math.E;
+            float sigmaSquared = sigma*sigma;
+            float denominator = 2*sigmaSquared;
 
-            // TODO: add your functionality and checks
+            // Creation of the filter kernel
+            for (int x = 0; x < size; x++)
+            for (int y = 0; y < size; y++)
+            {
+                int xSquared = (int)Math.Pow(x,2);
+                int ySquared = (int)Math.Pow(y,2);
+
+                filter[x,y] = (1 / (pi*denominator))*
+                            ((float)Math.Pow(E, -((xSquared+ySquared)/denominator)));
+            }
+
+            // Normalization of the filter kernel
+            float totalValue = 0;
+            for (int x = 0; x < size; x++)
+            for (int y = 0; y < size; y++)
+            {
+                totalValue += filter[x,y];
+            }
+            for (int x = 0; x < size; x++)
+            for (int y = 0; y < size; y++)
+            {
+                filter[x,y] = filter[x,y]/totalValue;
+            }
 
             return filter;
         }
@@ -448,8 +474,6 @@ namespace ImageApp
                 if(inputImage[x,y]<threshold) tempImage[x,y] = 0b00000000;
                 else tempImage[x,y] = 0b11111111;
             }
-
-            // TODO: add your functionality and checks, think about how to represent the binary values
 
             return tempImage;
         }
