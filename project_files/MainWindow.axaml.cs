@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
+using System.Diagnostics;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -337,7 +338,6 @@ namespace ImageApp
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
             int w = tempImage.GetLength(0);
             int h = tempImage.GetLength(1);
-            // TODO: add your functionality and checks
             for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
             {
@@ -356,9 +356,25 @@ namespace ImageApp
             // create temporary grayscale image
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
 
-            // TODO: add your functionality and checks
+            int w = tempImage.GetLength(0);
+            int h = tempImage.GetLength(1);
+            byte maxValue = 0;
+            byte minValue = byte.MaxValue;
+            Debug.WriteLine("Initialised");
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                maxValue = inputImage[x, y] > maxValue ? inputImage[x, y] : maxValue;
+                minValue = inputImage[x, y] < minValue ? inputImage[x, y] : minValue;
+            }
+            float contrastCoefficient = byte.MaxValue / (maxValue - minValue);
+            Debug.WriteLine($"Max Value: {maxValue} Min Value: {minValue} CC: {contrastCoefficient}");
 
-
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                tempImage[x, y] = (byte)Math.Floor((inputImage[x, y] - minValue) * contrastCoefficient);
+            }
             return tempImage;
         }
 
@@ -413,11 +429,30 @@ namespace ImageApp
         private byte[,] ConvolveImage(byte[,] inputImage, float[,] filter)
         {
             // create temporary grayscale image
-            byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+            // byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+            byte[,] tempImage = AddMargin(inputImage, filter.GetLength(0)/2);
 
             // TODO: add your functionality and checks, think about border handling and type conversion
 
             return tempImage;
+        }
+
+        private byte[,] AddMargin(byte[,] inputImage, int margin)
+        {
+            int iW = inputImage.GetLength(0);
+            int iH = inputImage.GetLength(1);
+            int iX;
+            int iY;
+            byte[,] tempImage = new byte[iW + 2 * margin, iH + 2 * margin];
+            for (int x = 0; x < iW + margin * 2; x++)
+            for (int y = 0; y < iH + margin * 2; y++)
+            {
+                iX = Math.Min(Math.Max(x - margin, 0), iW - 1);
+                iY = Math.Min(Math.Max(y - margin, 0), iH - 1);
+                tempImage[x, y] = inputImage[iX, iY];
+            }
+            return tempImage;
+
         }
 
         /// <summary>
