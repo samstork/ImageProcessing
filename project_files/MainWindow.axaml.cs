@@ -458,6 +458,13 @@ namespace ImageApp
             // create temporary grayscale image
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
 
+            for (int x = 0; x < inputImage.GetLength(0); x++)
+            for (int y = 0; y < inputImage.GetLength(1); y++)
+            {
+                if(inputImage[x,y]<threshold) tempImage[x,y] = 0b00000000;
+                else tempImage[x,y] = 0b11111111;
+            }
+
             // TODO: add your functionality and checks, think about how to represent the binary values
 
             return tempImage;
