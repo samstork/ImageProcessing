@@ -335,9 +335,14 @@ namespace ImageApp
         {
             // create temporary grayscale image
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
-
+            int w = tempImage.GetLength(0);
+            int h = tempImage.GetLength(1);
             // TODO: add your functionality and checks
-
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                tempImage[x, y] = (byte)(byte.MaxValue-inputImage[x, y]);
+            }
             return tempImage;
         }
 
@@ -352,6 +357,7 @@ namespace ImageApp
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
 
             // TODO: add your functionality and checks
+
 
             return tempImage;
         }
