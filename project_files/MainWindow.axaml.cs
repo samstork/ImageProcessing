@@ -215,7 +215,7 @@ namespace ImageApp
                             gray = AdjustContrast(gray);
                             break;
                         case ProcessingFunctions.ConvolveImage:
-                            gray = ConvolveImage(gray, CreateGaussianFilter(5, 1.0f));
+                            gray = ConvolveImage(gray, CreateGaussianFilter(10, 2.0f));
                             break;
                         case ProcessingFunctions.MedianFilter:
                             gray = MedianFilter(gray, 5);
@@ -397,8 +397,8 @@ namespace ImageApp
             for (int x = 0; x < size; x++)
             for (int y = 0; y < size; y++)
             {
-                int xSquared = (int)Math.Pow(x,2);
-                int ySquared = (int)Math.Pow(y,2);
+                int xSquared = (int)Math.Pow(x - size/2,2);
+                int ySquared = (int)Math.Pow(y - size/2,2);
 
                 filter[x,y] = (1 / (pi*denominator))*
                             ((float)Math.Pow(E, -((xSquared+ySquared)/denominator)));
@@ -416,7 +416,17 @@ namespace ImageApp
             {
                 filter[x,y] = filter[x,y]/totalValue;
             }
+            
+            for (int x = 0; x < size; x++)
+            {
+                for (int y = 0; y < size; y++)
+                {
+                    Debug.Write($"{filter[x,y]} ");
+                }
+                Debug.Write("\n");
 
+            }
+        
             return filter;
         }
 
@@ -429,7 +439,6 @@ namespace ImageApp
         private byte[,] ConvolveImage(byte[,] inputImage, float[,] filter)
         {
             // create temporary grayscale image
-            // byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
             int fSize = filter.GetLength(0);
             byte[,] marginImage = AddMargin(inputImage, fSize/2);
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
@@ -443,14 +452,10 @@ namespace ImageApp
                 for (int fX = 0; fX < fSize; fX++)
                 for (int fY = 0; fY < fSize; fY++)
                 {
-                    // Debug.WriteLine($"X: {x + fX - fSize}, Y: {y + fY - fSize/2}, fX: {fX}, fY: {fY}");
                     newValue += marginImage[x + fX, y + fY] * filter[fX, fY];
                 }
                 tempImage[x, y] = (byte)Math.Clamp((float)newValue, 0, byte.MaxValue);
             }
-
-            // TODO: add your functionality and checks, think about border handling and type conversion
-
             return tempImage;
         }
 
@@ -481,10 +486,27 @@ namespace ImageApp
         private byte[,] MedianFilter(byte[,] inputImage, byte kernelSize)
         {
             // create temporary grayscale image
+
+            int fSize = (int)kernelSize;
+            byte[,] marginImage = AddMargin(inputImage, fSize/2);
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+            
+            int vLen = (int)Math.Pow(kernelSize, 2);
 
-            // TODO: add your functionality and checks, think about border handling
-
+            int w = tempImage.GetLength(0);
+            int h = tempImage.GetLength(1);
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                byte[] valueArray = new byte[vLen];
+                for (int fX = 0; fX < fSize; fX++)
+                for (int fY = 0; fY < fSize; fY++)
+                {
+                    valueArray[fX + fY * fSize] = marginImage[x + fX, y + fY];
+                }
+                Array.Sort(valueArray);
+                tempImage[x, y] = valueArray[(int)Math.Ceiling((float)vLen/2)];
+            }
             return tempImage;
         }
 
