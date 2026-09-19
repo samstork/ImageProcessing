@@ -404,7 +404,24 @@ namespace ImageApp
         {
             // create temporary grayscale image
             // byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
-            byte[,] tempImage = AddMargin(inputImage, filter.GetLength(0)/2);
+            int fSize = filter.GetLength(0);
+            byte[,] marginImage = AddMargin(inputImage, fSize/2);
+            byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+    
+            int w = tempImage.GetLength(0);
+            int h = tempImage.GetLength(1);
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                float newValue = 0;
+                for (int fX = 0; fX < fSize; fX++)
+                for (int fY = 0; fY < fSize; fY++)
+                {
+                    // Debug.WriteLine($"X: {x + fX - fSize}, Y: {y + fY - fSize/2}, fX: {fX}, fY: {fY}");
+                    newValue += marginImage[x + fX, y + fY] * filter[fX, fY];
+                }
+                tempImage[x, y] = (byte)Math.Clamp((float)newValue, 0, byte.MaxValue);
+            }
 
             // TODO: add your functionality and checks, think about border handling and type conversion
 
