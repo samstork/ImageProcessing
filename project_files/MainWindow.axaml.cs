@@ -222,8 +222,19 @@ namespace ImageApp
                             break;
                         case ProcessingFunctions.EdgeMagnitude:
                         {
-                            sbyte[,] horizontalKernel = null; // Define this kernel yourself
-                            sbyte[,] verticalKernel = null; // Define this kernel yourself
+                            float[,] horizontalKernel = new float[,]
+                            {
+                                {-1f/8f, 0, 1f/8f},
+                                {-2f/8f, 0, 2f/8f},
+                                {-1f/8f, 0, 1f/8f}
+                            };
+                            float[,] verticalKernel = new float[,]
+                            {
+                                {-1f/8f, -2f/8f, -1f/8f},
+                                {     0,      0,      0},
+                                { 1f/8f,  2f/8f,  1f/8f}
+                            };
+                            Print2DArray(horizontalKernel);
                             gray = EdgeMagnitude(gray, horizontalKernel, verticalKernel);
                             break;
                         }
@@ -327,6 +338,20 @@ namespace ImageApp
         // ==================== FUNCTIONS TO IMPLEMENT =======================
         // ====================================================================
 
+
+        public static void Print2DArray<T>(T[,] matrix)
+        {
+            for (int i = 0; i < matrix.GetLength(0); i++)
+            {
+                for (int j = 0; j < matrix.GetLength(1); j++)
+                {
+                    Console.Write(matrix[i,j] + "\t");
+                }
+                Console.WriteLine();
+            }
+        }
+
+
         /// <summary>
         /// Inverts the intensity values of the input grayscale image.
         /// </summary>
@@ -405,6 +430,13 @@ namespace ImageApp
             }
 
             // Normalization of the filter kernel
+            return NormalizeFilter(filter);
+
+        }
+
+        private float[,] NormalizeFilter(float[,] filter)
+        {
+            int size = filter.GetLength(0);
             float totalValue = 0;
             for (int x = 0; x < size; x++)
             for (int y = 0; y < size; y++)
@@ -416,20 +448,9 @@ namespace ImageApp
             {
                 filter[x,y] = filter[x,y]/totalValue;
             }
-            
-            for (int x = 0; x < size; x++)
-            {
-                for (int y = 0; y < size; y++)
-                {
-                    Debug.Write($"{filter[x,y]} ");
-                }
-                Debug.Write("\n");
-
-            }
         
             return filter;
         }
-
         /// <summary>
         /// Convolves a grayscale image with a given 2D filter kernel.
         /// </summary>
@@ -438,10 +459,24 @@ namespace ImageApp
         /// <returns>The convolved grayscale image.</returns>
         private byte[,] ConvolveImage(byte[,] inputImage, float[,] filter)
         {
+            short[,] convolvedImage = SConvolveImage(inputImage, filter);
+            int w = convolvedImage.GetLength(0);
+            int h = convolvedImage.GetLength(1);
+            byte[,] byteImage = new byte[w, h];
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                byteImage[x, y] = (byte)Math.Clamp(convolvedImage[x, y], (short)0, byte.MaxValue);
+
+            }
+            return byteImage;
+        }
+        private short[,] SConvolveImage(byte[,] inputImage, float[,] filter)
+        {
             // create temporary grayscale image
             int fSize = filter.GetLength(0);
             byte[,] marginImage = AddMargin(inputImage, fSize/2);
-            byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+            short[,] tempImage = new short[inputImage.GetLength(0), inputImage.GetLength(1)];
     
             int w = tempImage.GetLength(0);
             int h = tempImage.GetLength(1);
@@ -454,7 +489,7 @@ namespace ImageApp
                 {
                     newValue += marginImage[x + fX, y + fY] * filter[fX, fY];
                 }
-                tempImage[x, y] = (byte)Math.Clamp((float)newValue, 0, byte.MaxValue);
+                tempImage[x, y] = (short)newValue;
             }
             return tempImage;
         }
@@ -519,18 +554,25 @@ namespace ImageApp
         /// <returns>The edge gradient magnitude image.</returns>
         private byte[,] EdgeMagnitude(
             byte[,] inputImage,
-            sbyte[,] horizontalKernel,
-            sbyte[,] verticalKernel
+            float[,] horizontalKernel,
+            float[,] verticalKernel
         )
         {
+            Debug.WriteLine(horizontalKernel[0,0]);
             // create temporary grayscale image
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
 
-            // TODO: add your functionality and checks, think about border handling and type conversion (negative values!)
+            short[,] tempImageH = SConvolveImage(inputImage, horizontalKernel);
+            short[,] tempImageV = SConvolveImage(inputImage, verticalKernel);
+            for (int x = 0; x < inputImage.GetLength(0); x++)
+            for (int y = 0; y < inputImage.GetLength(1); y++)
+            {
+                tempImage[x, y] = (byte)Math.Sqrt(Math.Pow(tempImageH[x, y], 2) + Math.Pow(tempImageV[x, y], 2));
+            }
 
             return tempImage;
-        }
 
+        }
         /// <summary>
         /// Thresholds a grayscale image into a binary representation based on a cutoff value.
         /// </summary>
