@@ -1,4 +1,4 @@
-/project_files/bin/*
-/project_files/obj/Debug/*
+ImageProcessing/project_files/bin/*
+ImageProcessing/project_files/obj/Debug/*
 
 processed.png
