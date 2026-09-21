@@ -370,7 +370,7 @@ namespace ImageApp
             }
             return tempImage;
         }
-
+ 
         /// <summary>
         /// Adjusts the contrast of the input grayscale image.
         /// </summary>
@@ -434,6 +434,14 @@ namespace ImageApp
 
         }
 
+        /// <summary>
+        /// This is a function that normalizes all values in the given 2-Dimensional
+        /// matrix to have a total value of 1.
+        /// This is achieved by adding all elements to eachother, followed by  
+        /// division of said elements by the total value.
+        /// </summary>
+        /// <param name="filter">The 2D filter kernel.</param>
+        /// <returns>The filter normalized to a sum of 1.</param>
         private float[,] NormalizeFilter(float[,] filter)
         {
             int size = filter.GetLength(0);
@@ -451,6 +459,7 @@ namespace ImageApp
         
             return filter;
         }
+
         /// <summary>
         /// Convolves a grayscale image with a given 2D filter kernel.
         /// </summary>
