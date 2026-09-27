@@ -633,7 +633,7 @@ namespace ImageApp
                     // Check if the offset element is within the bounds of the image.
                     if ((x_offset>=0) && (x_offset<x) && (y_offset>=0) && (y_offset<y))
                     {
-                        if(inputImage[x_offset, y_offset] != structElem[u,v])
+                        if((inputImage[x_offset, y_offset] && structElem[u,v]) == 0)
                         {
                             output[i,j] = 0; 
                         }
