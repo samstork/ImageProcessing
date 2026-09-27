@@ -1,4 +1,12 @@
-ImageProcessing/project_files/bin/*
-ImageProcessing/project_files/obj/Debug/*
+**/bin/
+**/obj/
 
-processed.png
+*.png
+
+.vs/
+*.suo
+*.user
+*.userosscache
+*.rsuser
+
+.vscode/
