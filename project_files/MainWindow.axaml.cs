@@ -611,8 +611,40 @@ namespace ImageApp
         /// <returns>The eroded binary image.</returns>
         private byte[,] BinaryErodeImage(byte[,] inputImage, bool[,] structElem)
         {
-            byte[,] output = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
-            // TODO: implement binary erosion
+            int x = inputImage.GetLength(0);
+            int y = inputImage.GetLength(1);
+            int x_struct = structElem.GetLength(0);
+            int y_struct = structElem.GetLength(1);
+            byte[,] output = new byte[x,y];
+
+            // For all pixels in the input image.
+            for (int i = 0; i<x; i++)
+            for (int j = 0; j<y; j++)
+            {
+                output[i,j] = 1;
+                // For all pixels in the structuring element.
+                for (int u = 0; u < x_struct; u++)
+                for (int v = 0; v < y_struct; v++)
+                {
+                    // Calculate the offset
+                    int x_offset = i+(u-(x_struct/2));
+                    int y_offset = j+(v-(y_struct/2));
+
+                    // Check if the offset element is within the bounds of the image.
+                    if ((x_offset>=0) && (x_offset<x) && (y_offset>=0) && (y_offset<y))
+                    {
+                        if(inputImage[x_offset, y_offset] != structElem[u,v])
+                        {
+                            output[i,j] = 0; 
+                        }
+                    }
+                    else
+                    {
+                        output[i,j] = 0;
+                    }
+                }
+            }
+
             return output;
         }
 
