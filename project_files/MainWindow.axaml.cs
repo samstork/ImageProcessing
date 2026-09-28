@@ -631,7 +631,10 @@ namespace ImageApp
             for (int i = 0; i<x; i++)
             for (int j = 0; j<y; j++)
             {
+                if (inputImage[i,j] == 0) continue;
+                
                 output[i,j] = 0;
+                bool make_white = true;
                 // For all pixels in the structuring element.
                 for (int u = 0; u < x_struct; u++)
                 for (int v = 0; v < y_struct; v++)
@@ -639,19 +642,16 @@ namespace ImageApp
                     // Calculate the offset
                     int x_offset = i+(u-(x_struct/2));
                     int y_offset = j+(v-(y_struct/2));
-
-                    // Check if the offset element is within the bounds of the image.
                     if ((x_offset>=0) && (x_offset<x) && (y_offset>=0) && (y_offset<y))
                     {
-                        if((inputImage[x_offset, y_offset] != 0) && structElem[u,v])
-                        {
-                            output[i,j] = 255; 
-                        }
+                        if (!structElem[u,v]) continue;
+                        if (inputImage[x_offset, y_offset]==255) continue;
                     }
-                    else
-                    {
-                        output[i,j] = 0;
-                    }
+                    make_white = false;
+                }
+                if (make_white)
+                {
+                    output[i,j] = 255;
                 }
             }
 
