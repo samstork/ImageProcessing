@@ -244,14 +244,24 @@ namespace ImageApp
 
                         case ProcessingFunctions.BinaryErodeImage:
                         {
-                            bool[,] structElem = null; // Define this structuring element yourself
+                            bool[,] structElem = 
+                            {
+                                { false, true,  false },
+                                { true,  true,  true  },
+                                { false, true,  false }
+                            }; // Define this structuring element yourself
                             gray = BinaryErodeImage(gray, structElem);
                             break;
                         }
 
                         case ProcessingFunctions.BinaryDilateImage:
                         {
-                            bool[,] structElem = null; // Define this structuring element yourself
+                            bool[,] structElem = 
+                            {
+                                { false, true,  false },
+                                { true,  true,  true  },
+                                { false, true,  false }
+                            }; // Define this structuring element yourself
                             gray = BinaryDilateImage(gray, structElem);
                             break;
                         }
@@ -621,7 +631,7 @@ namespace ImageApp
             for (int i = 0; i<x; i++)
             for (int j = 0; j<y; j++)
             {
-                output[i,j] = 1;
+                output[i,j] = 255;
                 // For all pixels in the structuring element.
                 for (int u = 0; u < x_struct; u++)
                 for (int v = 0; v < y_struct; v++)
@@ -679,7 +689,7 @@ namespace ImageApp
                     {
                         if((inputImage[i, j] != 0) && structElem[(x_struct/2),(y_struct/2)])
                         {
-                            output[x_offset,y_offset] = 1; 
+                            output[x_offset,y_offset] = 255; 
                         }
                     }
                 }
