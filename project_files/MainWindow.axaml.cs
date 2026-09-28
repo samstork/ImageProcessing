@@ -631,7 +631,7 @@ namespace ImageApp
             for (int i = 0; i<x; i++)
             for (int j = 0; j<y; j++)
             {
-                output[i,j] = 255;
+                output[i,j] = 0;
                 // For all pixels in the structuring element.
                 for (int u = 0; u < x_struct; u++)
                 for (int v = 0; v < y_struct; v++)
@@ -645,7 +645,7 @@ namespace ImageApp
                     {
                         if((inputImage[x_offset, y_offset] != 0) && structElem[u,v])
                         {
-                            output[i,j] = 0; 
+                            output[i,j] = 255; 
                         }
                     }
                     else
@@ -676,6 +676,7 @@ namespace ImageApp
             for (int i = 0; i<x; i++)
             for (int j = 0; j<y; j++)
             {
+                output[i,j] = inputImage[i,j];
                 // For all pixels in the structuring element.
                 for (int u = 0; u < x_struct; u++)
                 for (int v = 0; v < y_struct; v++)
