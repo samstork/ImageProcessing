@@ -292,14 +292,28 @@ namespace ImageApp
 
                         case ProcessingFunctions.GrayscaleErodeImage:
                         {
-                            int[,] grayStructElem = null; // Define this structuring element yourself
+                            int[,] grayStructElem =
+                            {
+                                { 1, 2, 3, 2, 1 },
+                                { 2, 3, 4, 3, 2 },
+                                { 3, 4, 5, 4, 3 },
+                                { 2, 3, 4, 3, 2 },
+                                { 1, 2, 3, 2, 1 }
+                            }; // Define this structuring element yourself
                             gray = GrayscaleErodeImage(gray, grayStructElem);
                             break;
                         }
 
                         case ProcessingFunctions.GrayscaleDilateImage:
                         {
-                            int[,] grayStructElem = null; // Define this structuring element yourself
+                            int[,] grayStructElem =
+                            {
+                                { 1, 2, 3, 2, 1 },
+                                { 2, 3, 4, 3, 2 },
+                                { 3, 4, 5, 4, 3 },
+                                { 2, 3, 4, 3, 2 },
+                                { 1, 2, 3, 2, 1 }
+                            }; // Define this structuring element yourself
                             gray = GrayscaleDilateImage(gray, grayStructElem);
                             break;
                         }
@@ -749,8 +763,37 @@ namespace ImageApp
         /// <returns>The eroded grayscale image.</returns>
         private byte[,] GrayscaleErodeImage(byte[,] inputImage, int[,] structElem)
         {
-            byte[,] output = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
-            // TODO: implement grayscale erosion
+            int x = inputImage.GetLength(0);
+            int y = inputImage.GetLength(1);
+            int x_struct = structElem.GetLength(0);
+            int y_struct = structElem.GetLength(1);
+            byte[,] output = new byte[x,y];
+
+            // For all pixels in the input image.
+            for (int i = 0; i<x; i++)
+            for (int j = 0; j<y; j++)
+            {
+                byte min = 255;
+                // For all pixels in the structuring element, find the minimum value.
+                for (int u = 0; u < x_struct; u++)
+                for (int v = 0; v < y_struct; v++)
+                {
+                    // Calculate the offset
+                    int x_offset = i+(u-(x_struct/2));
+                    int y_offset = j+(v-(y_struct/2));
+
+                    // Check if the offset element is within the bounds of the image.
+                    if ((x_offset>=0) && (x_offset<x) && (y_offset>=0) && (y_offset<y))
+                    {
+                        if (Convert.ToByte(inputImage[x_offset, y_offset]-Convert.ToByte(structElem[u,v]))<min)
+                        {
+                            min = Convert.ToByte(inputImage[x_offset, y_offset]-Convert.ToByte(structElem[u,v]));
+                            if (min<0) min = 0;
+                        }
+                    }
+                }
+                output[i,j] = min;
+            }
             return output;
         }
 
@@ -762,8 +805,37 @@ namespace ImageApp
         /// <returns>The dilated grayscale image.</returns>
         private byte[,] GrayscaleDilateImage(byte[,] inputImage, int[,] structElem)
         {
-            byte[,] output = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
-            // TODO: implement grayscale dilation
+            int x = inputImage.GetLength(0);
+            int y = inputImage.GetLength(1);
+            int x_struct = structElem.GetLength(0);
+            int y_struct = structElem.GetLength(1);
+            byte[,] output = new byte[x,y];
+
+            // For all pixels in the input image.
+            for (int i = 0; i<x; i++)
+            for (int j = 0; j<y; j++)
+            {
+                byte max = 0;
+                // For all pixels in the structuring element, find the minimum value.
+                for (int u = 0; u < x_struct; u++)
+                for (int v = 0; v < y_struct; v++)
+                {
+                    // Calculate the offset
+                    int x_offset = i+(u-(x_struct/2));
+                    int y_offset = j+(v-(y_struct/2));
+
+                    // Check if the offset element is within the bounds of the image.
+                    if ((x_offset>=0) && (x_offset<x) && (y_offset>=0) && (y_offset<y))
+                    {
+                        if (Convert.ToByte(inputImage[x_offset, y_offset]+Convert.ToByte(structElem[u,v]))>max)
+                        {
+                            max = Convert.ToByte(inputImage[x_offset, y_offset]+Convert.ToByte(structElem[u,v]));
+                            if (max>255) max = 255;
+                        }
+                    }
+                }
+                output[i,j] = max;
+            }
             return output;
         }
 
