@@ -268,14 +268,24 @@ namespace ImageApp
 
                         case ProcessingFunctions.BinaryOpenImage:
                         {
-                            bool[,] structElem = null; // Define this structuring element yourself
+                            bool[,] structElem = 
+                            {
+                                { false, true,  false },
+                                { true,  true,  true  },
+                                { false, true,  false }
+                            }; // Define this structuring element yourself
                             gray = BinaryOpenImage(gray, structElem);
                             break;
                         }
 
                         case ProcessingFunctions.BinaryCloseImage:
                         {
-                            bool[,] structElem = null; // Define this structuring element yourself
+                            bool[,] structElem = 
+                            {
+                                { false, true,  false },
+                                { true,  true,  true  },
+                                { false, true,  false }
+                            }; // Define this structuring element yourself
                             gray = BinaryCloseImage(gray, structElem);
                             break;
                         }
@@ -708,7 +718,10 @@ namespace ImageApp
         private byte[,] BinaryOpenImage(byte[,] inputImage, bool[,] structElem)
         {
             byte[,] output = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
-            // TODO: implement binary opening
+            // Perform erosion
+            output = BinaryErodeImage(inputImage, structElem);
+            // Perform dilation on erosion output
+            output = BinaryDilateImage(output, structElem);
             return output;
         }
 
@@ -721,7 +734,10 @@ namespace ImageApp
         private byte[,] BinaryCloseImage(byte[,] inputImage, bool[,] structElem)
         {
             byte[,] output = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
-            // TODO: implement binary closing
+            // Perform dilation
+            output = BinaryDilateImage(inputImage, structElem);
+            // Perform erosion
+            output = BinaryErodeImage(output, structElem);
             return output;
         }
 
