@@ -18,6 +18,18 @@ namespace ImageApp
         // Simple fixed defaults used by the functions below until you add your own
         // GUI controls (TextBoxes, ComboBoxes, etc.) to let the user set these values.
         private byte _threshold = 128;
+        private static float[,] _horizontalKernel = new float[,]
+        {
+            {-1f, 0, 1f},
+            {-2f, 0, 2f},
+            {-1f, 0, 1f}
+        };
+        private static float[,] _verticalKernel = new float[,]
+        {
+            {-1f, -2f, -1f},
+            {  0,   0,   0},
+            { 1f,  2f,  1f}
+        };
 
         // Enum for operations. As you implement each function, add a case for it
         // in OnApply below; the dropdown is populated automatically from this list.
@@ -39,6 +51,8 @@ namespace ImageApp
             BinaryCloseImage,
             GrayscaleErodeImage,
             GrayscaleDilateImage,
+            Task1,
+            Task2,
         }
 
         private enum StructuringElements
@@ -52,9 +66,9 @@ namespace ImageApp
         
         private enum FilterOptions
         {
-            RegularOperation,
             Gaussian,
             Median,
+            None,
         }
 
         public MainWindow()
@@ -221,18 +235,7 @@ namespace ImageApp
             float sigmaValue = (float)SigmaBox.Value;
             byte thresholdValue = (byte)ThresholdBox.Value;
             byte kernelSize = (byte)KernelBox.Value;
-            float[,] horizontalKernel = new float[,]
-            {
-                {-1f, 0, 1f},
-                {-2f, 0, 2f},
-                {-1f, 0, 1f}
-            };
-            float[,] verticalKernel = new float[,]
-            {
-                {-1f, -2f, -1f},
-                {     0,      0,      0},
-                { 1f,  2f,  1f}
-            };
+
 
 
             ApplyButton.IsEnabled = false;
@@ -251,8 +254,6 @@ namespace ImageApp
                     // from a previous Apply's result.
                     byte[,] gray = ConvertToGrayscale(colorPixels);
 
-                    if (selectedFilter == FilterOptions.RegularOperation)
-                    {
                         switch (selected)
                             {
                                 case ProcessingFunctions.ConvertToGrayscale:
@@ -274,7 +275,7 @@ namespace ImageApp
                                     break;
                                 case ProcessingFunctions.EdgeMagnitude:
                                 {
-                                    gray = EdgeMagnitude(gray, horizontalKernel, verticalKernel);
+                                    gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
                                     break;
                                 }
                                 case ProcessingFunctions.ThresholdImage:
@@ -356,24 +357,23 @@ namespace ImageApp
                                     gray = GrayscaleDilateImage(gray, grayStructElem);
                                     break;
                                 }
+                                case ProcessingFunctions.Task1:
+                                {
+                                    if (selectedFilter == FilterOptions.Gaussian)
+                                    {
+                                        gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+
+                                    } else if (selectedFilter == FilterOptions.Median)
+                                    {
+                                        gray = MedianFilter(gray, kernelSize);
+                                    } 
+                                    gray = Task1Pipeline(gray, thresholdValue);
+                                    break;
+                                }
 
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
                             }
-                    } else
-                    {
-                        if (selectedFilter == FilterOptions.Gaussian)
-                        {
-                            gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
-
-                        } else
-                        {
-                            gray = MedianFilter(gray, kernelSize);
-                        }
-                        gray = EdgeMagnitude(gray, horizontalKernel, verticalKernel);
-                        gray = ThresholdImage(gray, thresholdValue);
-
-                    }
 
                     var bmp = ByteArrayToBitmap(gray);
                     return (gray, bmp);
@@ -425,7 +425,12 @@ namespace ImageApp
         // ==================== FUNCTIONS TO IMPLEMENT =======================
         // ====================================================================
 
-
+        private static byte[,] Task1Pipeline(byte[,] gray, byte thresholdValue)
+        {
+            gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
+            gray = ThresholdImage(gray, thresholdValue);
+            return gray;
+        }
         public static void Print2DArray<T>(T[,] matrix)
         {
             for (int i = 0; i < matrix.GetLength(0); i++)
@@ -567,7 +572,7 @@ namespace ImageApp
             }
             return byteImage;
         }
-        private short[,] SConvolveImage(byte[,] inputImage, float[,] filter)
+        private static short[,] SConvolveImage(byte[,] inputImage, float[,] filter)
         {
             // create temporary grayscale image
             int fSize = filter.GetLength(0);
@@ -590,7 +595,7 @@ namespace ImageApp
             return tempImage;
         }
 
-        private byte[,] AddMargin(byte[,] inputImage, int margin)
+        private static byte[,] AddMargin(byte[,] inputImage, int margin)
         {
             int iW = inputImage.GetLength(0);
             int iH = inputImage.GetLength(1);
@@ -648,7 +653,7 @@ namespace ImageApp
         /// <param name="horizontalKernel">Horizontal gradient kernel.</param>
         /// <param name="verticalKernel">Vertical gradient kernel.</param>
         /// <returns>The edge gradient magnitude image.</returns>
-        private byte[,] EdgeMagnitude(
+        private static byte[,] EdgeMagnitude(
             byte[,] inputImage,
             float[,] horizontalKernel,
             float[,] verticalKernel
@@ -675,7 +680,7 @@ namespace ImageApp
         /// <param name="inputImage">The 2D input grayscale image.</param>
         /// <param name="threshold">Intensity threshold cutoff value in [0, 255].</param>
         /// <returns>A binary image represented as byte intensities (e.g. 0 and 255).</returns>
-        private byte[,] ThresholdImage(byte[,] inputImage, byte threshold)
+        private static byte[,] ThresholdImage(byte[,] inputImage, byte threshold)
         {
             // create temporary grayscale image
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
