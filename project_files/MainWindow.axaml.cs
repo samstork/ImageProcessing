@@ -48,6 +48,12 @@ namespace ImageApp
             11x11,
             15x15,
             19x19,
+        
+        private enum FilterOptions
+        {
+            RegularOperation,
+            Gaussian,
+            Median,
         }
 
         public MainWindow()
@@ -57,6 +63,14 @@ namespace ImageApp
             OperationBox.ItemsSource = Enum.GetValues<ProcessingFunctions>();
             OperationBox.ItemsSource = Enum.GetValues<StructuringElement>();
             OperationBox.SelectedIndex = 0; // Select first item by default
+
+            FilterBox.ItemsSource = Enum.GetValues<FilterOptions>();
+            FilterBox.SelectedIndex = 0;
+            
+            SigmaBox.Value = 1;
+            ThresholdBox.Value = 120;
+
+            KernelBox.Value = 5;
         }
 
         /// <summary>
@@ -195,6 +209,29 @@ namespace ImageApp
                 return;
             }
 
+            if (FilterBox.SelectedItem is not FilterOptions selectedFilter)
+            {
+                StatusText.Text = "Please select a valid Mode.";
+                return;
+            }
+
+            float sigmaValue = (float)SigmaBox.Value;
+            byte thresholdValue = (byte)ThresholdBox.Value;
+            byte kernelSize = (byte)KernelBox.Value;
+            float[,] horizontalKernel = new float[,]
+            {
+                {-1f, 0, 1f},
+                {-2f, 0, 2f},
+                {-1f, 0, 1f}
+            };
+            float[,] verticalKernel = new float[,]
+            {
+                {-1f, -2f, -1f},
+                {     0,      0,      0},
+                { 1f,  2f,  1f}
+            };
+
+
             ApplyButton.IsEnabled = false;
             StatusText.Text = "Processing...";
 
@@ -211,125 +248,128 @@ namespace ImageApp
                     // from a previous Apply's result.
                     byte[,] gray = ConvertToGrayscale(colorPixels);
 
-                    switch (selected)
+                    if (selectedFilter == FilterOptions.RegularOperation)
                     {
-                        case ProcessingFunctions.ConvertToGrayscale:
-                            // Already fully working; gray already holds the grayscale
-                            // conversion result at this point (computed above, before this switch),
-                            // so nothing further is needed here.
-                            break;
-                        case ProcessingFunctions.InvertImage:
-                            gray = InvertImage(gray);
-                            break;
-                        case ProcessingFunctions.AdjustContrast:
-                            gray = AdjustContrast(gray);
-                            break;
-                        case ProcessingFunctions.ConvolveImage:
-                            gray = ConvolveImage(gray, CreateGaussianFilter(10, 2.0f));
-                            break;
-                        case ProcessingFunctions.MedianFilter:
-                            gray = MedianFilter(gray, 5);
-                            break;
-                        case ProcessingFunctions.EdgeMagnitude:
-                        {
-                            float[,] horizontalKernel = new float[,]
+                        switch (selected)
                             {
-                                {-1f/8f, 0, 1f/8f},
-                                {-2f/8f, 0, 2f/8f},
-                                {-1f/8f, 0, 1f/8f}
-                            };
-                            float[,] verticalKernel = new float[,]
-                            {
-                                {-1f/8f, -2f/8f, -1f/8f},
-                                {     0,      0,      0},
-                                { 1f/8f,  2f/8f,  1f/8f}
-                            };
-                            Print2DArray(horizontalKernel);
-                            gray = EdgeMagnitude(gray, horizontalKernel, verticalKernel);
-                            break;
-                        }
-                        case ProcessingFunctions.ThresholdImage:
-                            gray = ThresholdImage(gray, _threshold);
-                            break;
+                                case ProcessingFunctions.ConvertToGrayscale:
+                                    // Already fully working; gray already holds the grayscale
+                                    // conversion result at this point (computed above, before this switch),
+                                    // so nothing further is needed here.
+                                    break;
+                                case ProcessingFunctions.InvertImage:
+                                    gray = InvertImage(gray);
+                                    break;
+                                case ProcessingFunctions.AdjustContrast:
+                                    gray = AdjustContrast(gray);
+                                    break;
+                                case ProcessingFunctions.ConvolveImage:
+                                    gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+                                    break;
+                                case ProcessingFunctions.MedianFilter:
+                                    gray = MedianFilter(gray, 5);
+                                    break;
+                                case ProcessingFunctions.EdgeMagnitude:
+                                {
+                                    gray = EdgeMagnitude(gray, horizontalKernel, verticalKernel);
+                                    break;
+                                }
+                                case ProcessingFunctions.ThresholdImage:
+                                    gray = ThresholdImage(gray, thresholdValue);
+                                    break;
 
-                        case ProcessingFunctions.BinaryErodeImage:
-                        {
-                            bool[,] structElem = 
-                            {
-                                { false, true,  false },
-                                { true,  true,  true  },
-                                { false, true,  false }
-                            }; // Define this structuring element yourself
-                            gray = BinaryErodeImage(gray, structElem);
-                            break;
-                        }
+                                case ProcessingFunctions.BinaryErodeImage:
+                                {
+                                    bool[,] structElem = 
+                                    {
+                                        { false, true,  false },
+                                        { true,  true,  true  },
+                                        { false, true,  false }
+                                    }; // Define this structuring element yourself
+                                    gray = BinaryErodeImage(gray, structElem);
+                                    break;
+                                }
 
-                        case ProcessingFunctions.BinaryDilateImage:
-                        {
-                            bool[,] structElem = 
-                            {
-                                { false, true,  false },
-                                { true,  true,  true  },
-                                { false, true,  false }
-                            }; // Define this structuring element yourself
-                            gray = BinaryDilateImage(gray, structElem);
-                            break;
-                        }
+                                case ProcessingFunctions.BinaryDilateImage:
+                                {
+                                    bool[,] structElem = 
+                                    {
+                                        { false, true,  false },
+                                        { true,  true,  true  },
+                                        { false, true,  false }
+                                    }; // Define this structuring element yourself
+                                    gray = BinaryDilateImage(gray, structElem);
+                                    break;
+                                }
 
-                        case ProcessingFunctions.BinaryOpenImage:
-                        {
-                            bool[,] structElem = 
-                            {
-                                { false, true,  false },
-                                { true,  true,  true  },
-                                { false, true,  false }
-                            }; // Define this structuring element yourself
-                            gray = BinaryOpenImage(gray, structElem);
-                            break;
-                        }
+                                case ProcessingFunctions.BinaryOpenImage:
+                                {
+                                    bool[,] structElem = 
+                                    {
+                                        { false, true,  false },
+                                        { true,  true,  true  },
+                                        { false, true,  false }
+                                    }; // Define this structuring element yourself
+                                    gray = BinaryOpenImage(gray, structElem);
+                                    break;
+                                }
 
-                        case ProcessingFunctions.BinaryCloseImage:
-                        {
-                            bool[,] structElem = 
-                            {
-                                { false, true,  false },
-                                { true,  true,  true  },
-                                { false, true,  false }
-                            }; // Define this structuring element yourself
-                            gray = BinaryCloseImage(gray, structElem);
-                            break;
-                        }
+                                case ProcessingFunctions.BinaryCloseImage:
+                                {
+                                    bool[,] structElem = 
+                                    {
+                                        { false, true,  false },
+                                        { true,  true,  true  },
+                                        { false, true,  false }
+                                    }; // Define this structuring element yourself
+                                    gray = BinaryCloseImage(gray, structElem);
+                                    break;
+                                }
 
-                        case ProcessingFunctions.GrayscaleErodeImage:
-                        {
-                            int[,] grayStructElem =
-                            {
-                                { 1, 2, 3, 2, 1 },
-                                { 2, 3, 4, 3, 2 },
-                                { 3, 4, 5, 4, 3 },
-                                { 2, 3, 4, 3, 2 },
-                                { 1, 2, 3, 2, 1 }
-                            }; // Define this structuring element yourself
-                            gray = GrayscaleErodeImage(gray, grayStructElem);
-                            break;
-                        }
+                                case ProcessingFunctions.GrayscaleErodeImage:
+                                {
+                                    int[,] grayStructElem =
+                                    {
+                                        { 1, 2, 3, 2, 1 },
+                                        { 2, 3, 4, 3, 2 },
+                                        { 3, 4, 5, 4, 3 },
+                                        { 2, 3, 4, 3, 2 },
+                                        { 1, 2, 3, 2, 1 }
+                                    }; // Define this structuring element yourself
+                                    gray = GrayscaleErodeImage(gray, grayStructElem);
+                                    break;
+                                }
 
-                        case ProcessingFunctions.GrayscaleDilateImage:
-                        {
-                            int[,] grayStructElem =
-                            {
-                                { 1, 2, 3, 2, 1 },
-                                { 2, 3, 4, 3, 2 },
-                                { 3, 4, 5, 4, 3 },
-                                { 2, 3, 4, 3, 2 },
-                                { 1, 2, 3, 2, 1 }
-                            }; // Define this structuring element yourself
-                            gray = GrayscaleDilateImage(gray, grayStructElem);
-                            break;
-                        }
+                                case ProcessingFunctions.GrayscaleDilateImage:
+                                {
+                                    int[,] grayStructElem =
+                                    {
+                                        { 1, 2, 3, 2, 1 },
+                                        { 2, 3, 4, 3, 2 },
+                                        { 3, 4, 5, 4, 3 },
+                                        { 2, 3, 4, 3, 2 },
+                                        { 1, 2, 3, 2, 1 }
+                                    }; // Define this structuring element yourself
+                                    gray = GrayscaleDilateImage(gray, grayStructElem);
+                                    break;
+                                }
 
-                        default:
-                            throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
+                                default:
+                                    throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
+                            }
+                    } else
+                    {
+                        if (selectedFilter == FilterOptions.Gaussian)
+                        {
+                            gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+
+                        } else
+                        {
+                            gray = MedianFilter(gray, kernelSize);
+                        }
+                        gray = EdgeMagnitude(gray, horizontalKernel, verticalKernel);
+                        gray = ThresholdImage(gray, thresholdValue);
+
                     }
 
                     var bmp = ByteArrayToBitmap(gray);
