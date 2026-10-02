@@ -30,6 +30,12 @@ namespace ImageApp
             {  0,   0,   0},
             { 1f,  2f,  1f}
         };
+        private static bool[,] _plusStructElem = 
+        {
+            { false, true,  false },
+            { true,  true,  true  },
+            { false, true,  false }  
+        };
 
         // Enum for operations. As you implement each function, add a case for it
         // in OnApply below; the dropdown is populated automatically from this list.
@@ -53,6 +59,7 @@ namespace ImageApp
             GrayscaleDilateImage,
             Task1,
             Task2,
+            Task3,
         }
         
         private enum FilterOptions
@@ -275,76 +282,38 @@ namespace ImageApp
 
                                 case ProcessingFunctions.BinaryErodeImage:
                                 {
-                                    bool[,] structElem = 
-                                    {
-                                        { false, true,  false },
-                                        { true,  true,  true  },
-                                        { false, true,  false }
-                                    }; // Define this structuring element yourself
-                                    gray = BinaryErodeImage(gray, structElem);
+                                    gray = BinaryErodeImage(gray, _plusStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.BinaryDilateImage:
                                 {
-                                    bool[,] structElem = 
-                                    {
-                                        { false, true,  false },
-                                        { true,  true,  true  },
-                                        { false, true,  false }
-                                    }; // Define this structuring element yourself
-                                    gray = BinaryDilateImage(gray, structElem);
+                                    gray = BinaryDilateImage(gray, _plusStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.BinaryOpenImage:
                                 {
-                                    bool[,] structElem = 
-                                    {
-                                        { false, true,  false },
-                                        { true,  true,  true  },
-                                        { false, true,  false }
-                                    }; // Define this structuring element yourself
-                                    gray = BinaryOpenImage(gray, structElem);
+                                    gray = BinaryOpenImage(gray, _plusStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.BinaryCloseImage:
                                 {
-                                    bool[,] structElem = 
-                                    {
-                                        { false, true,  false },
-                                        { true,  true,  true  },
-                                        { false, true,  false }
-                                    }; // Define this structuring element yourself
-                                    gray = BinaryCloseImage(gray, structElem);
+                                    gray = BinaryCloseImage(gray, _plusStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.GrayscaleErodeImage:
                                 {
-                                    int[,] grayStructElem =
-                                    {
-                                        { 0, 0, 0, 0, 0 },
-                                        { 0, 0, 0, 0, 0 },
-                                        { 0, 0, 0, 0, 0 },
-                                        { 0, 0, 0, 0, 0 },
-                                        { 0, 0, 0, 0, 0 }
-                                    }; // Define this structuring element yourself
+                                    int[,] grayStructElem = new int[5,5];
                                     gray = GrayscaleErodeImage(gray, grayStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.GrayscaleDilateImage:
                                 {
-                                    int[,] grayStructElem =
-                                    {
-                                        { 0, 0, 0, 0, 0 },
-                                        { 0, 0, 0, 0, 0 },
-                                        { 0, 0, 0, 0, 0 },
-                                        { 0, 0, 0, 0, 0 },
-                                        { 0, 0, 0, 0, 0 }
-                                    }; // Define this structuring element yourself
+                                    int[,] grayStructElem = new int[5,5];
                                     gray = GrayscaleDilateImage(gray, grayStructElem);
                                     break;
                                 }
@@ -365,6 +334,12 @@ namespace ImageApp
                                 {
                                     int[,] grayStructElem = new int[kernelSize,kernelSize];
                                     gray = GrayscaleErodeImage(gray, grayStructElem);
+                                    break;
+                                }
+                                case ProcessingFunctions.Task3:
+                                {
+                                    bool[,] grayStructElem = new bool[kernelSize,kernelSize];
+                                    gray = BinaryCloseImage(gray, grayStructElem);
                                     break;
                                 }
 
@@ -422,13 +397,14 @@ namespace ImageApp
         // ==================== FUNCTIONS TO IMPLEMENT =======================
         // ====================================================================
 
+
         private static byte[,] Task1Pipeline(byte[,] gray, byte thresholdValue)
         {
             gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
             gray = ThresholdImage(gray, thresholdValue);
             return gray;
         }
-        
+
         public static void Print2DArray<T>(T[,] matrix)
         {
             for (int i = 0; i < matrix.GetLength(0); i++)
