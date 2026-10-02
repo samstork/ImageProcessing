@@ -54,15 +54,6 @@ namespace ImageApp
             Task1,
             Task2,
         }
-
-        private enum StructuringElements
-        {
-            _3x3,
-            _7x7,
-            _11x11,
-            _15x15,
-            _19x19,
-        }
         
         private enum FilterOptions
         {
@@ -80,9 +71,6 @@ namespace ImageApp
 
             FilterBox.ItemsSource = Enum.GetValues<FilterOptions>();
             FilterBox.SelectedIndex = 0;
-
-            StructuringElement.ItemsSource = Enum.GetValues<StructuringElements>();
-            StructuringElement.SelectedIndex = 0;
             
             SigmaBox.Value = 1;
             ThresholdBox.Value = 120;
@@ -232,11 +220,14 @@ namespace ImageApp
                 return;
             }
 
-            float sigmaValue = (float)SigmaBox.Value;
-            byte thresholdValue = (byte)ThresholdBox.Value;
-            byte kernelSize = (byte)KernelBox.Value;
+            float sigmaValue = 1;
+            if (!(SigmaBox.Value==null)) sigmaValue = (float)SigmaBox.Value;
 
-
+            byte thresholdValue = 120;
+            if (!(ThresholdBox.Value==null)) thresholdValue = (byte)ThresholdBox.Value;
+            
+            byte kernelSize = 3;
+            if (!(KernelBox==null)) kernelSize = (byte)KernelBox.Value;
 
             ApplyButton.IsEnabled = false;
             StatusText.Text = "Processing...";
@@ -368,6 +359,12 @@ namespace ImageApp
                                         gray = MedianFilter(gray, kernelSize);
                                     } 
                                     gray = Task1Pipeline(gray, thresholdValue);
+                                    break;
+                                }
+                                case ProcessingFunctions.Task2:
+                                {
+                                    int[,] grayStructElem = new int[kernelSize,kernelSize];
+                                    gray = GrayscaleErodeImage(gray, grayStructElem);
                                     break;
                                 }
 
