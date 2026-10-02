@@ -9,3 +9,5 @@
 *.rsuser
 
 .vscode/
+processed.png
+temp.py

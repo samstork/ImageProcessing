@@ -53,7 +53,7 @@
     -->
       <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" Margin="0,0,0,4" VerticalAlignment="Center">
         <ComboBox x:Name="FilterBox" Width="150" VerticalAlignment="Center"/>
-        <TextBlock Text="Kernel Size:" VerticalAlignment="Center"/>
+        <TextBlock Text="Structuring Element / Kernel Size:" VerticalAlignment="Center"/>
         <TextBlock Text="{Binding #KernelBox.Value}" MinWidth = "20" VerticalAlignment="Center"/>
         <Slider x:Name="KernelBox" Width="150" Value="100" Orientation="Horizontal" 
           IsSnapToTickEnabled="True" Minimum = "3" Maximum="21" TickPlacement="BottomRight"
@@ -65,11 +65,7 @@
         <NumericUpDown x:Name = "ThresholdBox" Minimum = "0" Maximum="255" MinWidth = "120" FormatString = "0"/>
       </StackPanel>
 
-    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="10" Margin="0,0,0,0">
-        <ComboBox x:Name="StructuringElement" Width="150" VerticalAlignment="Center"/>
-    </StackPanel>
-
-    <TextBlock Grid.Row="4" x:Name="StatusText" Text="" TextWrapping="Wrap" Margin="0,4,0,0"/>
+    <TextBlock Grid.Row="3" x:Name="StatusText" Text="" TextWrapping="Wrap" Margin="0,4,0,0"/>
 
   </Grid>
 </Window>
