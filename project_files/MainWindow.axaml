@@ -51,9 +51,18 @@
       read their values in OnApply. You may restructure this GUI as needed,
       as long as every implemented function stays reachable through the interface.
     -->
-    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" Margin="0,0,0,4">
-      <!-- Add custom parameter controls here -->
-    </StackPanel>
+      <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" Margin="0,0,0,4" VerticalAlignment="Center">
+        <ComboBox x:Name="FilterBox" Width="150" VerticalAlignment="Center"/>
+        <TextBlock Text="Kernel Size:" VerticalAlignment="Center"/>
+        <TextBlock Text="{Binding #KernelBox.Value}" MinWidth = "20" VerticalAlignment="Center"/>
+        <Slider x:Name="KernelBox" Width="150" Value="100" Orientation="Horizontal" 
+          IsSnapToTickEnabled="True" Minimum = "3" Maximum="21" TickPlacement="BottomRight"
+          Ticks="3, 5, 7, 9, 11, 13, 15, 17, 19, 21" VerticalAlignment="Center"/>
+        <TextBlock Text="Sigma:" VerticalAlignment="Center"/>
+        <TextBox x:Name="SigmaBox" Width="25" VerticalAlignment="Center" Watermark="S"/>
+        <TextBlock Text="Threshold:" VerticalAlignment="Center"/>
+        <TextBox x:Name="ThresholdBox" Width="25" VerticalAlignment="Center" Watermark="TS"/>
+      </StackPanel>
 
     <TextBlock Grid.Row="3" x:Name="StatusText" Text="" TextWrapping="Wrap" Margin="0,4,0,0"/>
 
