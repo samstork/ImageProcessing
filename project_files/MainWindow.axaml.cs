@@ -431,6 +431,7 @@ namespace ImageApp
             gray = ThresholdImage(gray, thresholdValue);
             return gray;
         }
+        
         public static void Print2DArray<T>(T[,] matrix)
         {
             for (int i = 0; i < matrix.GetLength(0); i++)
