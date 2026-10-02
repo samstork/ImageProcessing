@@ -41,13 +41,14 @@ namespace ImageApp
             GrayscaleDilateImage,
         }
 
-        private enum StructuringElement
+        private enum StructuringElements
         {
-            3x3,
-            7x7,
-            11x11,
-            15x15,
-            19x19,
+            _3x3,
+            _7x7,
+            _11x11,
+            _15x15,
+            _19x19,
+        }
         
         private enum FilterOptions
         {
@@ -61,11 +62,13 @@ namespace ImageApp
             InitializeComponent();
 
             OperationBox.ItemsSource = Enum.GetValues<ProcessingFunctions>();
-            OperationBox.ItemsSource = Enum.GetValues<StructuringElement>();
             OperationBox.SelectedIndex = 0; // Select first item by default
 
             FilterBox.ItemsSource = Enum.GetValues<FilterOptions>();
             FilterBox.SelectedIndex = 0;
+
+            StructuringElement.ItemsSource = Enum.GetValues<StructuringElements>();
+            StructuringElement.SelectedIndex = 0;
             
             SigmaBox.Value = 1;
             ThresholdBox.Value = 120;
