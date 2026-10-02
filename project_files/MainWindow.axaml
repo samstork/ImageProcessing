@@ -62,7 +62,7 @@
         <NumericUpDown x:Name = "SigmaBox" Minimum = "0" Maximum="5" MinWidth = "120" FormatString = "0.00" Increment = "0.01"/>
 
         <TextBlock Text="Threshold:" VerticalAlignment="Center" />
-        <NumericUpDown x:Name = "ThresholdBox" Minimum = "0" Maximum="255" MinWidth = "120" FormatString = "0"/>
+        <NumericUpDown x:Name = "ThresholdBox" Minimum = "0" Maximum="255" MinWidth = "120" FormatString = "0" Label = "threshold"/>
       </StackPanel>
 
     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="10" Margin="0,0,0,0">
