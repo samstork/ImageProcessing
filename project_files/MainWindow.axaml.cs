@@ -41,11 +41,21 @@ namespace ImageApp
             GrayscaleDilateImage,
         }
 
+        private enum StructuringElement
+        {
+            3x3,
+            7x7,
+            11x11,
+            15x15,
+            19x19,
+        }
+
         public MainWindow()
         {
             InitializeComponent();
 
             OperationBox.ItemsSource = Enum.GetValues<ProcessingFunctions>();
+            OperationBox.ItemsSource = Enum.GetValues<StructuringElement>();
             OperationBox.SelectedIndex = 0; // Select first item by default
         }
 
