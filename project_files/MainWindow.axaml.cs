@@ -333,11 +333,11 @@ namespace ImageApp
                                 {
                                     int[,] grayStructElem =
                                     {
-                                        { 1, 2, 3, 2, 1 },
-                                        { 2, 3, 4, 3, 2 },
-                                        { 3, 4, 5, 4, 3 },
-                                        { 2, 3, 4, 3, 2 },
-                                        { 1, 2, 3, 2, 1 }
+                                        { 0, 0, 0, 0, 0 },
+                                        { 0, 0, 0, 0, 0 },
+                                        { 0, 0, 0, 0, 0 },
+                                        { 0, 0, 0, 0, 0 },
+                                        { 0, 0, 0, 0, 0 }
                                     }; // Define this structuring element yourself
                                     gray = GrayscaleErodeImage(gray, grayStructElem);
                                     break;
@@ -347,11 +347,11 @@ namespace ImageApp
                                 {
                                     int[,] grayStructElem =
                                     {
-                                        { 1, 2, 3, 2, 1 },
-                                        { 2, 3, 4, 3, 2 },
-                                        { 3, 4, 5, 4, 3 },
-                                        { 2, 3, 4, 3, 2 },
-                                        { 1, 2, 3, 2, 1 }
+                                        { 0, 0, 0, 0, 0 },
+                                        { 0, 0, 0, 0, 0 },
+                                        { 0, 0, 0, 0, 0 },
+                                        { 0, 0, 0, 0, 0 },
+                                        { 0, 0, 0, 0, 0 }
                                     }; // Define this structuring element yourself
                                     gray = GrayscaleDilateImage(gray, grayStructElem);
                                     break;
