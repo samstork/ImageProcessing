@@ -339,7 +339,11 @@ namespace ImageApp
                                 case ProcessingFunctions.Task3:
                                 {
                                     bool[,] structElem = new bool[kernelSize,kernelSize];
-                                    for (int i )
+                                    for (byte i = 0; i < kernelSize; i++)
+                                    for (byte j = 0; j < kernelSize; j++)
+                                    {
+                                        structElem[i,j] = true;
+                                    }
                                     gray = BinaryCloseImage(gray, structElem);
                                     break;
                                 }
