@@ -338,8 +338,9 @@ namespace ImageApp
                                 }
                                 case ProcessingFunctions.Task3:
                                 {
-                                    bool[,] grayStructElem = new bool[kernelSize,kernelSize];
-                                    gray = BinaryCloseImage(gray, grayStructElem);
+                                    bool[,] structElem = new bool[kernelSize,kernelSize];
+                                    for (int i )
+                                    gray = BinaryCloseImage(gray, structElem);
                                     break;
                                 }
 
@@ -698,9 +699,9 @@ namespace ImageApp
                     // Calculate the offset
                     int x_offset = i+(u-(x_struct/2));
                     int y_offset = j+(v-(y_struct/2));
+                    if (!structElem[u,v]) continue; 
                     if ((x_offset>=0) && (x_offset<x) && (y_offset>=0) && (y_offset<y))
                     {
-                        if (!structElem[u,v]) continue;
                         if (inputImage[x_offset, y_offset]==255) continue;
                     }
                     make_white = false;
