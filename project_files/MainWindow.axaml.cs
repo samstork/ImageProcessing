@@ -17,7 +17,6 @@ namespace ImageApp
 
         // Simple fixed defaults used by the functions below until you add your own
         // GUI controls (TextBoxes, ComboBoxes, etc.) to let the user set these values.
-        private byte _threshold = 128;
         private static float[,] _horizontalKernel = new float[,]
         {
             {-1f, 0, 1f},
@@ -57,6 +56,7 @@ namespace ImageApp
             BinaryCloseImage,
             GrayscaleErodeImage,
             GrayscaleDilateImage,
+            EdgeSharpen,
             Task1,
             Task2,
             Task3,
@@ -83,6 +83,7 @@ namespace ImageApp
             ThresholdBox.Value = 120;
 
             KernelBox.Value = 5;
+            SharpenBox.Value = 1; 
         }
 
         /// <summary>
@@ -235,6 +236,9 @@ namespace ImageApp
             
             byte kernelSize = 3;
             if (!(KernelBox==null)) kernelSize = (byte)KernelBox.Value;
+            
+            float sharpenValue = 1f;
+            if (!(SharpenBox.Value == null))sharpenValue = (float)SharpenBox.Value;
 
             ApplyButton.IsEnabled = false;
             StatusText.Text = "Processing...";
@@ -315,6 +319,13 @@ namespace ImageApp
                                 {
                                     int[,] grayStructElem = new int[5,5];
                                     gray = GrayscaleDilateImage(gray, grayStructElem);
+                                    break;
+                                }
+                                case ProcessingFunctions.EdgeSharpen:
+                                {
+                                    byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+
+                                    gray = Sharpen(gray, mask, thresholdValue, sharpenValue);
                                     break;
                                 }
                                 case ProcessingFunctions.Task1:
@@ -875,6 +886,28 @@ namespace ImageApp
             }
             return output;
         }
+
+        private byte[,] Sharpen(byte[,] inputImage, byte[,] mask, byte threshold, float amount = 0.3f)
+        {
+            int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+            short val;
+            float result;
+            byte[,] output = new byte[w,h];
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                result = inputImage[x,y] - mask[x,y];
+                if (Math.Abs(result) > threshold) {
+                    output[x, y] = (byte)Math.Clamp(inputImage[x,y] + result * amount, 0, 255);
+                } else {
+                    output[x, y] = inputImage[x,y];
+                } 
+                // Debug.WriteLine("Input: {0}, Mask: {1}, Output: {2}", inputImage[x,y], mask[x,y], result);
+            }
+            return output;
+        }
+
 
         // ====================================================================
         // ==================== IMAGE <-> BITMAP HELPERS (given) =============
