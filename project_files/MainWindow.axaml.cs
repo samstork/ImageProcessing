@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
+using Avalonia.Input;
 
 namespace ImageApp
 {
@@ -17,7 +18,6 @@ namespace ImageApp
 
         // Simple fixed defaults used by the functions below until you add your own
         // GUI controls (TextBoxes, ComboBoxes, etc.) to let the user set these values.
-        private byte _threshold = 128;
         private static float[,] _horizontalKernel = new float[,]
         {
             {-1f, 0, 1f},
@@ -60,6 +60,9 @@ namespace ImageApp
             Task1,
             Task2,
             Task3,
+            EdgeSharpen,
+            HistogramCheck,
+
         }
         
         private enum FilterOptions
@@ -83,6 +86,7 @@ namespace ImageApp
             ThresholdBox.Value = 120;
 
             KernelBox.Value = 5;
+            SharpenBox.Value = 1; 
         }
 
         /// <summary>
@@ -235,12 +239,16 @@ namespace ImageApp
             
             byte kernelSize = 3;
             if (!(KernelBox==null)) kernelSize = (byte)KernelBox.Value;
+            
+            float sharpenValue = 1f;
+            if (!(SharpenBox.Value == null))sharpenValue = (float)SharpenBox.Value;
 
             ApplyButton.IsEnabled = false;
             StatusText.Text = "Processing...";
+            string newStatusText = $"Completed {selected}.";
 
             byte[,,] colorPixels = _loadedColorPixels;
-
+            
             try
             {
                 // Run computation and bitmap generation on a background task
@@ -317,6 +325,13 @@ namespace ImageApp
                                     gray = GrayscaleDilateImage(gray, grayStructElem);
                                     break;
                                 }
+                                case ProcessingFunctions.EdgeSharpen:
+                                {
+                                    byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+
+                                    gray = Sharpen(gray, mask, thresholdValue, sharpenValue);
+                                    break;
+                                }
                                 case ProcessingFunctions.Task1:
                                 {
                                     if (selectedFilter == FilterOptions.Gaussian)
@@ -347,7 +362,40 @@ namespace ImageApp
                                     gray = BinaryCloseImage(gray, structElem);
                                     break;
                                 }
-
+                                case ProcessingFunctions.HistogramCheck:
+                                {  
+                                    List<(int x, int y)>[] hist = GenerateHistogram(gray);
+                                    byte min = 0;
+                                    byte max = 0;
+                                    for (short i = 0; i <= 255; i++)
+                                    {
+                                        if (hist[i].Count > 0)
+                                        {
+                                            min = (byte)i;
+                                            break;
+                                        }
+                                    }
+                                    for (short i = 255; i >= 0; i--)
+                                    {
+                                        if (hist[i].Count > 0)
+                                        {
+                                            max = (byte)i;
+                                            break;
+                                        }
+                                    }
+                                    bool fullContrast = max == 255 && min == 0;
+                                    bool fullDynamicRange = true;
+                                    for (short i = min; i < max; i++)
+                                    {
+                                        if (!(hist[i].Count > 0))
+                                        {
+                                            fullDynamicRange = false;
+                                            break;
+                                        }
+                                    }
+                                    newStatusText = $"This image {(fullContrast ? "has" : "does not have")} maximum contrast and {(fullDynamicRange ? "has" : "does not have")} maximum dynamic range.";
+                                    break;
+                                }
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
                             }
@@ -359,7 +407,8 @@ namespace ImageApp
                 _processedGray = resultGray;
                 (ProcessedImage.Source as IDisposable)?.Dispose();
                 ProcessedImage.Source = resultBmp;
-                StatusText.Text = $"Completed {selected}.";
+                StatusText.Text = newStatusText;
+
             }
             catch (Exception ex)
             {
@@ -463,7 +512,12 @@ namespace ImageApp
                 maxValue = inputImage[x, y] > maxValue ? inputImage[x, y] : maxValue;
                 minValue = inputImage[x, y] < minValue ? inputImage[x, y] : minValue;
             }
-            float contrastCoefficient = byte.MaxValue / (maxValue - minValue);
+            float contrastCoefficient = 1f;
+            if (maxValue - minValue > 0)
+            {
+                contrastCoefficient = (float)byte.MaxValue / (maxValue - minValue);
+
+            }
             Debug.WriteLine($"Max Value: {maxValue} Min Value: {minValue} CC: {contrastCoefficient}");
 
             for (int x = 0; x < w; x++)
@@ -873,6 +927,44 @@ namespace ImageApp
                     }
                 }
                 output[i,j] = max;
+            }
+            return output;
+        }
+
+        private byte[,] Sharpen(byte[,] inputImage, byte[,] mask, byte threshold, float amount = 0.3f)
+        {
+            int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+            float result;
+            byte[,] output = new byte[w,h];
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                result = inputImage[x,y] - mask[x,y];
+                if (Math.Abs(result) > threshold) {
+                    output[x, y] = (byte)Math.Clamp(inputImage[x,y] + result * amount, 0, 255);
+                } else {
+                    output[x, y] = inputImage[x,y];
+                } 
+                // Debug.WriteLine("Input: {0}, Mask: {1}, Output: {2}", inputImage[x,y], mask[x,y], result);
+            }
+            return output;
+        }
+
+        private List<(int x, int y)>[] GenerateHistogram(byte[,] inputImage)
+        {
+            int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+            List<(int x, int y)>[] output = new List<(int x, int y)>[256];
+            for (int i = 0; i < 256; i++)
+            {
+                output[i] = new List<(int x, int y)>();
+            }
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                (int x, int y) coords = (x, y);
+                output[inputImage[x,y]].Add(coords);
             }
             return output;
         }
