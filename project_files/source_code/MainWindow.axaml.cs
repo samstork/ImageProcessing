@@ -14,7 +14,11 @@ namespace ImageApp
     {
         private WriteableBitmap? _loadedBitmap; // the raw loaded image, kept in color, for display in OriginalImage
         private byte[,,]? _loadedColorPixels; // [x, y, channel] with channel 0=R, 1=G, 2=B -- extracted once at load time
+        private byte[,,]? _loadedColorRef; // [x, y, channel] with channel 0=R, 1=G, 2=B -- extracted once at load time
+
         private byte[,]? _processedGray; // Processed grayscale values (nullable)
+        private byte[,]? _processedGrayRef; // Processed grayscale values (nullable)
+
 
         // Simple fixed defaults used by the functions below until you add your own
         // GUI controls (TextBoxes, ComboBoxes, etc.) to let the user set these values.
@@ -62,6 +66,7 @@ namespace ImageApp
             Task3,
             EdgeSharpen,
             HistogramCheck,
+            HistogramMatch,
 
         }
         
@@ -164,6 +169,74 @@ namespace ImageApp
             }
         }
 
+        private async void OnLoadReference(object? sender, RoutedEventArgs e)
+        {
+            if (!StorageProvider.CanOpen)
+            {
+                StatusText.Text = "Opening files is not supported on this system.";
+                return;
+            }
+
+            try
+            {
+                var files = await StorageProvider.OpenFilePickerAsync(
+                    new()
+                    {
+                        Title = "Open Image",
+                        AllowMultiple = false,
+                        FileTypeFilter = [FilePickerFileTypes.ImageAll]
+                    }
+                );
+
+                var file = files.FirstOrDefault();
+                if (file == null)
+                    return;
+
+                await using var stream = await file.OpenReadAsync();
+
+                // Decode the file using Avalonia's own image loader
+                using var decoded = new Bitmap(stream);
+                var size = decoded.PixelSize;
+                int width = size.Width;
+                int height = size.Height;
+
+                // Force a known, fixed pixel layout (RGBA, 8 bits per channel, unpremultiplied alpha)
+                // so we can reliably read raw bytes regardless of the source file's own format.
+                _loadedBitmap?.Dispose();
+                _loadedBitmap = new(size, new(96, 96), PixelFormat.Rgba8888, AlphaFormat.Unpremul);
+
+                _loadedColorRef = new byte[width, height, 3];
+                using (var fb = _loadedBitmap.Lock())
+                {
+                    decoded.CopyPixels(fb, AlphaFormat.Unpremul);
+                    // ^ transcodes the decoded image into our WriteableBitmap's RGBA8888 layout
+
+                    int totalBytes = fb.RowBytes * height;
+                    byte[] buffer = new byte[totalBytes];
+                    Marshal.Copy(fb.Address, buffer, 0, totalBytes);
+
+                    for (int y = 0; y < height; y++)
+                    {
+                        int rowStart = y * fb.RowBytes;
+                        for (int x = 0; x < width; x++)
+                        {
+                            int idx = rowStart + x * 4; // 4 bytes per pixel: R, G, B, A
+                            _loadedColorRef[x, y, 0] = buffer[idx + 0];
+                            _loadedColorRef[x, y, 1] = buffer[idx + 1];
+                            _loadedColorRef[x, y, 2] = buffer[idx + 2];
+                        }
+                    }
+                }
+
+                _processedGrayRef = null;
+                StatusText.Text = $"Loaded reference ({width} \u00d7 {height} px).";
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Failed to load reference: {ex.Message}";
+            }
+        }
+
         /// <summary>
         /// Saves the current processed grayscale image to disk as a PNG file.
         /// </summary>
@@ -227,7 +300,7 @@ namespace ImageApp
 
             if (FilterBox.SelectedItem is not FilterOptions selectedFilter)
             {
-                StatusText.Text = "Please select a valid Mode.";
+                StatusText.Text = "Please select a valid Filter.";
                 return;
             }
 
@@ -248,7 +321,6 @@ namespace ImageApp
             string newStatusText = $"Completed {selected}.";
 
             byte[,,] colorPixels = _loadedColorPixels;
-            
             try
             {
                 // Run computation and bitmap generation on a background task
@@ -364,36 +436,19 @@ namespace ImageApp
                                 }
                                 case ProcessingFunctions.HistogramCheck:
                                 {  
-                                    List<(int x, int y)>[] hist = GenerateHistogram(gray);
-                                    byte min = 0;
-                                    byte max = 0;
-                                    for (short i = 0; i <= 255; i++)
+                                    newStatusText = HistogramCheck(gray);
+                                    break;
+                                }
+                                case ProcessingFunctions.HistogramMatch:
+                                {
+                                    if (_loadedColorRef == null)
                                     {
-                                        if (hist[i].Count > 0)
-                                        {
-                                            min = (byte)i;
-                                            break;
-                                        }
+                                        newStatusText = "Please load a reference image.";
+                                        break;
                                     }
-                                    for (short i = 255; i >= 0; i--)
-                                    {
-                                        if (hist[i].Count > 0)
-                                        {
-                                            max = (byte)i;
-                                            break;
-                                        }
-                                    }
-                                    bool fullContrast = max == 255 && min == 0;
-                                    bool fullDynamicRange = true;
-                                    for (short i = min; i < max; i++)
-                                    {
-                                        if (!(hist[i].Count > 0))
-                                        {
-                                            fullDynamicRange = false;
-                                            break;
-                                        }
-                                    }
-                                    newStatusText = $"This image {(fullContrast ? "has" : "does not have")} maximum contrast and {(fullDynamicRange ? "has" : "does not have")} maximum dynamic range.";
+                                    byte[,,] colorRef = _loadedColorRef;
+                                    byte[,] grayRef = ConvertToGrayscale(colorRef);
+                                    gray = MatchHistograms(gray, grayRef);
                                     break;
                                 }
                                 default:
@@ -518,7 +573,6 @@ namespace ImageApp
                 contrastCoefficient = (float)byte.MaxValue / (maxValue - minValue);
 
             }
-            Debug.WriteLine($"Max Value: {maxValue} Min Value: {minValue} CC: {contrastCoefficient}");
 
             for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
@@ -621,7 +675,7 @@ namespace ImageApp
                 for (int fX = 0; fX < fSize; fX++)
                 for (int fY = 0; fY < fSize; fY++)
                 {
-                    newValue += marginImage[x + fX, y + fY] * filter[fX, fY];
+                    newValue += marginImage[x + fX, y + fY] * filter[fSize - 1 - fX, fSize - 1 - fY];
                 }
                 tempImage[x, y] = (short)newValue;
             }
@@ -692,7 +746,6 @@ namespace ImageApp
             float[,] verticalKernel
         )
         {
-            Debug.WriteLine(horizontalKernel[0,0]);
             // create temporary grayscale image
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
 
@@ -803,7 +856,7 @@ namespace ImageApp
 
                     // Check if the offset element is within the bounds of the image.
                     if ((x_offset>=0) && (x_offset<x) && (y_offset>=0) && (y_offset<y))
-                    {
+            {
                         if((inputImage[i, j] != 0) && structElem[(u),(v)])
                         {
                             output[x_offset,y_offset] = 255; 
@@ -965,6 +1018,78 @@ namespace ImageApp
             {
                 (int x, int y) coords = (x, y);
                 output[inputImage[x,y]].Add(coords);
+            }
+            return output;
+        }
+
+        private string HistogramCheck(byte[,] gray)
+        {
+            List<(int x, int y)>[] hist = GenerateHistogram(gray);
+            byte min = 0;
+            byte max = 0;
+            for (short i = 0; i <= 255; i++)
+            {
+                if (hist[i].Count > 0)
+                {
+                    min = (byte)i;
+                    break;
+                }
+            }
+            for (short i = 255; i >= 0; i--)
+            {
+                if (hist[i].Count > 0)
+                {
+                    max = (byte)i;
+                    break;
+                }
+            }
+            bool fullContrast = max == 255 && min == 0;
+            bool fullDynamicRange = true;
+            for (short i = min; i < max; i++)
+            {
+                if (!(hist[i].Count > 0))
+                {
+                    fullDynamicRange = false;
+                    break;
+                }
+            }
+            return $"This image {(fullContrast ? "has" : "does not have")} maximum contrast and {(fullDynamicRange ? "has" : "does not have")} maximum dynamic range.";
+        }
+
+        private byte[,] MatchHistograms(byte[,] inputImage, byte[,] referenceImage)
+        {
+            List<(int x, int y)>[] hist = GenerateHistogram(inputImage);
+            List<(int x, int y)>[] histRef = GenerateHistogram(referenceImage);
+
+
+            long inputCoefficient = inputImage.GetLength(0) * (long)inputImage.GetLength(1); 
+            long referenceCoefficient = referenceImage.GetLength(0) * (long)referenceImage.GetLength(1); 
+
+            long cumulative = 0;
+            long cumulativeRef = 0;
+            long cumulativePotential;
+            byte[] intensities = new byte[256];
+            byte[,] output = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+            int j = 0;
+            for(int i = 0; i<=255; i++)
+            {
+                cumulativeRef += histRef[i].Count * inputCoefficient;
+                Debug.WriteLine(cumulativeRef);
+                Debug.WriteLine(cumulative);
+
+                while (j < 256)
+                {
+                    cumulativePotential = cumulative + hist[j].Count * referenceCoefficient;
+                    if (cumulativePotential > cumulativeRef) break;
+                    cumulative = cumulativePotential;
+                    intensities[j] = (byte)i;
+                    j++;
+                }
+            }
+            for(int u = 0; u <  inputImage.GetLength(0); u++)
+            for(int v = 0; v < inputImage.GetLength(1); v++)
+            {
+                output[u, v] = intensities[inputImage[u, v]];
             }
             return output;
         }
