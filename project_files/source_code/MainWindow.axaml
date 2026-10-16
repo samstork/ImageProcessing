@@ -40,6 +40,8 @@
     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
       <Button Content="Load Image" Width="110" Click="OnLoadImage"/>
       <Button Content="Save Image" Width="110" Click="OnSaveImage"/>
+      <Button Content="Load Ref" Width="110" Click="OnLoadReference"/>
+
       <ComboBox x:Name="OperationBox" Width="240"/>
       <Button x:Name="ApplyButton" Content="Apply" Width="100" Click="OnApply"/>
     </StackPanel>
