@@ -1165,11 +1165,45 @@ namespace ImageApp
                 } 
             }// for loop over all pixels.
 
+            // Make an adjecency matrix containing all region values
+            bool[,] collision_matrix = new bool[label,label];
+            for (int i = 0; i<x; i++)
+            for (int j = 0; j<y; j++)
+            {
+                if (output[i,j] == 0) continue;
+                foreach (int row in new[] {i-1, i, i+1})
+                foreach (int column in new[] {j-1,j,j+1})
+                {
+                    if ((row==i)&&(column==j)) continue;
+                    if ((row<0)||(row>=x)||(column<0)||(column>=y)) continue;
+                    if (output[row,column]==0) continue;
+                    if (output[row,column]==output[i,j]) continue;
+                    collision_matrix[output[row,column],output[i,j]] = true;
+                }
+            }
+
+            // Resolving Collisions
+            for (byte i = 0; i<label; i++)
+            for (byte j = 0; j<label; j++)
+            {
+                if (!collision_matrix[i,j]) continue;
+                byte smallest = (i<j) ? i:j;
+                byte biggest = (i>j) ? i:j;
+                for (int u = 0; u<x; u++)
+                for (int v = 0; v<y; v++)
+                {
+                    if (output[u,v]==biggest) output[u,v] = smallest;
+                }
+                // set values in adjecency matrix to false
+                collision_matrix[i,j] = false;
+                collision_matrix[j,i] = false;
+            }
+
+
             // Make the image visible using contrast adjustment.
             // TODO: remove this for final project, should be done somewhere else.
             output = AdjustContrast(output);
 
-            // Resolving Collisions TODO
             return output;
         }
 
