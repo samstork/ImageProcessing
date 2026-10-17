@@ -67,7 +67,7 @@ namespace ImageApp
             EdgeSharpen,
             HistogramCheck,
             HistogramMatch,
-
+            SequentialRegionLabeling,
         }
         
         private enum FilterOptions
@@ -449,6 +449,11 @@ namespace ImageApp
                                     byte[,,] colorRef = _loadedColorRef;
                                     byte[,] grayRef = ConvertToGrayscale(colorRef);
                                     gray = MatchHistograms(gray, grayRef);
+                                    break;
+                                }
+                                case ProcessingFunctions.SequentialRegionLabeling:
+                                {
+                                    gray = sequentialRegionLabeling(gray);
                                     break;
                                 }
                                 default:
@@ -1091,6 +1096,80 @@ namespace ImageApp
             {
                 output[u, v] = intensities[inputImage[u, v]];
             }
+            return output;
+        }
+
+        /// <summary>
+        ///  Performs sequential region labeling on the binary input image.
+        /// </summary>
+        /// <param name="inputImage">The 2D input binary image.</param>
+        /// <returns>A new 2D grayscale image with labeled regions.</returns>
+        private byte[,] sequentialRegionLabeling(byte[,] inputImage)
+        {
+            // Labeling
+            int x = inputImage.GetLength(0);
+            int y = inputImage.GetLength(1);
+            byte[,] output = new byte[x,y];
+            
+            byte label = 2;
+
+            // For all pixels in the input image.
+            for (int i = 0; i<x; i++)
+            for (int j = 0; j<y; j++)
+            {
+                // Skip non-foreground pixels
+                if (inputImage[i,j]!=255) continue;
+                output[i,j] = 255;// Set the output pixel to foreground
+                byte temp_label = 255;
+                // Look at the neighbouring pixels.
+                // Top Left
+                if ((i>0)&&(j>0))
+                {
+                    if (output[i-1,j-1]!=0)
+                    {
+                        if (output[i-1,j-1] < temp_label) temp_label = output[i-1,j-1];
+                        output[i,j] = temp_label;
+                    }
+                }//[-1,-1]
+                // Top Middle
+                if (j>0)
+                {
+                    if (output[i,j-1]!=0)
+                    {
+                        if (output[i,j-1] < temp_label) temp_label = output[i,j-1];
+                        output[i,j] = temp_label;
+                    } 
+                }//[0,-1]
+                // Top Right
+                if ((i+1<x)&&(j>0))
+                {
+                    if (output[i+1,j-1]!=0){
+                        if (output[i+1,j-1] < temp_label) temp_label = output[i+1,j-1];
+                        output[i,j] = temp_label;
+                    }
+                }//[+1,-1]
+                // Centre Left
+                if (i>0)
+                {
+                    if (output[i-1,j]!=0){
+                        if (output[i-1,j] < temp_label) temp_label = output[i-1,j];
+                        output[i,j] = temp_label;
+                    }
+                }//[-1,0]
+
+                // If the pixel hasn't been labelled, label it here.
+                if(output[i,j]==255)
+                {
+                    output[i,j]=label;
+                    label+=1;
+                } 
+            }// for loop over all pixels.
+
+            // Make the image visible using contrast adjustment.
+            // TODO: remove this for final project, should be done somewhere else.
+            output = AdjustContrast(output);
+
+            // Resolving Collisions TODO
             return output;
         }
 
