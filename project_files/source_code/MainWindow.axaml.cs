@@ -68,6 +68,7 @@ namespace ImageApp
             HistogramCheck,
             HistogramMatch,
             SequentialRegionLabeling,
+            HoughTransform,
         }
         
         private enum FilterOptions
@@ -456,6 +457,13 @@ namespace ImageApp
                                     gray = sequentialRegionLabeling(gray);
                                     break;
                                 }
+                                case ProcessingFunctions.HoughTransform:
+                                {
+                                    // TODO: add binary detection. Contrast adjustment for check but not for hough transform 
+                                    int[,] output = HoughTransformer.HoughTransform(gray, true, 360, 360);
+                                    gray = IntToByte(output);
+                                    break; 
+                                }
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
                             }
@@ -565,7 +573,6 @@ namespace ImageApp
             int h = tempImage.GetLength(1);
             byte maxValue = 0;
             byte minValue = byte.MaxValue;
-            Debug.WriteLine("Initialised");
             for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
             {
@@ -583,6 +590,35 @@ namespace ImageApp
             for (int y = 0; y < h; y++)
             {
                 tempImage[x, y] = (byte)Math.Floor((inputImage[x, y] - minValue) * contrastCoefficient);
+            }
+            return tempImage;
+        }
+        private byte[,] IntToByte(int[,] inputImage)
+        {
+            // create temporary grayscale image
+            byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+
+            int w = tempImage.GetLength(0);
+            int h = tempImage.GetLength(1);
+            int maxValue = 0;
+            int minValue = int.MaxValue;
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                maxValue = inputImage[x, y] > maxValue ? inputImage[x, y] : maxValue;
+                minValue = inputImage[x, y] < minValue ? inputImage[x, y] : minValue;
+            }
+            float contrastCoefficient = 1f;
+            if (maxValue - minValue > 0 && maxValue > byte.MaxValue)
+            {
+                contrastCoefficient = (float)byte.MaxValue / maxValue;
+
+            }
+
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                tempImage[x, y] = (byte)Math.Round(inputImage[x, y] * contrastCoefficient);
             }
             return tempImage;
         }
