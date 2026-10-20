@@ -73,7 +73,7 @@ namespace ImageApp
             HoughLineSegments,
             BinaryPipeline,
             GrayscalePipeline,
-            Norm,
+            NormalizeAccumulator,
         }
         
         private enum FilterOptions
@@ -579,19 +579,20 @@ namespace ImageApp
                                     gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
                                     // Perform Hough transform (grayscale)
                                     int[,] accumulator = HoughTransformer.HoughTransform(gray, false, kValue, dValue);
+                                    // accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, false);
                                     // Pick out the most salient line fragments
                                     byte[,] accumulatorB = IntToByte(accumulator);
-                                    accumulatorB = AdjustContrast(accumulatorB);
+                                    // accumulatorB = AdjustContrast(accumulatorB);
                                     accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdSValue);
-                                    List<List<(int x, int y)>> segments = HoughTransformer.HoughLineSegments(gray, accumulatorB);
+                                    List<List<(int x, int y)>> segments = HoughTransformer.HoughLineSegments(gray, accumulatorB, thresholdTValue, segmentValue, gapValue);
                                     // Visualize most salient line segments in red
                                     result = HoughTransformer.VisualiseSegments(gray, segments);
                                     break;
                                 }
-                                case ProcessingFunctions.Norm:
+                                case ProcessingFunctions.NormalizeAccumulator:
                                 {
                                     bool binary = IsBinary(gray);
-                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, binary, 360, 360);
+                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, binary, kValue, dValue);
                                     accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, binary);
                                     result = AdjustContrast(IntToByte(accumulator));
                                     break;
