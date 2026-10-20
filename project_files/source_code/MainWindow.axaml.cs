@@ -467,7 +467,7 @@ namespace ImageApp
                                     for (int i = 0; i < image_width; i++)
                                     for (int j = 0; j < image_height; j++)
                                     {
-                                        if (gray[i,j]!=0)&&(gray[i,j]!=255) is_binary = false;
+                                        if ((gray[i,j]!=0)&&(gray[i,j]!=255)) is_binary = false;
                                     }
                                     int[,] output = HoughTransformer.HoughTransform(gray, is_binary, 360, 360);
                                     gray = IntToByte(output);
