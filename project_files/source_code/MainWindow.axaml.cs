@@ -74,6 +74,7 @@ namespace ImageApp
             BinaryPipeline,
             GrayscalePipeline,
             NormalizeAccumulator,
+            HoughCircleTransform,
         }
         
         private enum FilterOptions
@@ -356,6 +357,8 @@ namespace ImageApp
             byte thresholdValue = 120;
             if (!(ThresholdBox.Value==null)) thresholdValue = (byte)ThresholdBox.Value;
             
+            bool normalise = NormBox.IsChecked == true;
+            
             byte thresholdSValue = 120;
             if (!(ThresholdSBox.Value==null)) thresholdSValue = (byte)ThresholdSBox.Value;
 
@@ -537,7 +540,7 @@ namespace ImageApp
                                 }
                                 case ProcessingFunctions.HoughPeaks:
                                 {
-                                    result = HoughTransformer.HoughPeaks(gray, thresholdValue);
+                                    result = HoughTransformer.HoughPeaks(gray, thresholdSValue);
                                     break;
                                 }
                                 case ProcessingFunctions.HoughLineSegments:
@@ -579,9 +582,11 @@ namespace ImageApp
                                     gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
                                     // Perform Hough transform (grayscale)
                                     int[,] accumulator = HoughTransformer.HoughTransform(gray, false, kValue, dValue);
-                                    // accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, false);
+                                    if (normalise) {
+                                        accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, false);
+                                    }
                                     byte[,] accumulatorB = IntToByte(accumulator);
-                                    // accumulatorB = AdjustContrast(accumulatorB);
+                                    accumulatorB = AdjustContrast(accumulatorB);
 
                                     // Pick out the most salient line fragments
                                     accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdSValue);
@@ -597,6 +602,16 @@ namespace ImageApp
                                     accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, binary);
                                     result = AdjustContrast(IntToByte(accumulator));
                                     break;
+                                }
+                                case ProcessingFunctions.HoughCircleTransform:
+                                {
+                                    bool binary = IsBinary(gray);
+                                    int minRadius = 2;
+                                    int maxRadius = 20;
+                                    int[][,] accumulator = HoughTransformer.HoughCircleTransform(gray, binary, kValue, dValue, minRadius, maxRadius);
+                                    result = IntToByte(accumulator[4]);
+                                    break;
+
                                 }
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
