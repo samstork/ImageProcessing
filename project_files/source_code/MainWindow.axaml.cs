@@ -70,6 +70,7 @@ namespace ImageApp
             SequentialRegionLabeling,
             HoughTransform,
             HoughPeaks,
+            HoughLineSegments,
         }
         
         private enum FilterOptions
@@ -514,6 +515,16 @@ namespace ImageApp
                                     result = HoughTransformer.HoughPeaks(gray, thresholdValue);
                                     break;
                                 }
+                                case ProcessingFunctions.HoughLineSegments:
+                                {
+                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, true, 360, 360);
+                                    byte[,] accumulatorB = IntToByte(accumulator);
+                                    accumulatorB = AdjustContrast(accumulatorB);
+                                    accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdValue);
+                                    List<List<(int x, int y)>> segments = HoughTransformer.HoughLineSegments(gray, accumulatorB);
+                                    result = HoughTransformer.VisualiseSegments(gray, segments);
+                                    break;
+                                }   
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
                             }
@@ -525,7 +536,7 @@ namespace ImageApp
                         _ => throw new NotSupportedException()
                     };
 
-                    return (gray, bmp);
+                    return (result, bmp);
                 });
 
                 _processedResult = resultGray;
