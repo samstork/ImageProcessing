@@ -372,7 +372,7 @@ namespace ImageApp
             if (!(MaxGapBox.Value==null)) gapValue = (int)MaxGapBox.Value;
 
             int segmentValue = 50;
-            if (!(SegmentBox.Value==null)) gapValue = (int)SegmentBox.Value;
+            if (!(SegmentBox.Value==null)) segmentValue = (int)SegmentBox.Value;
 
             byte kernelSize = 3;
             if (!(KernelBox==null)) kernelSize = (byte)KernelBox.Value;
@@ -580,9 +580,10 @@ namespace ImageApp
                                     // Perform Hough transform (grayscale)
                                     int[,] accumulator = HoughTransformer.HoughTransform(gray, false, kValue, dValue);
                                     // accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, false);
-                                    // Pick out the most salient line fragments
                                     byte[,] accumulatorB = IntToByte(accumulator);
                                     // accumulatorB = AdjustContrast(accumulatorB);
+
+                                    // Pick out the most salient line fragments
                                     accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdSValue);
                                     List<List<(int x, int y)>> segments = HoughTransformer.HoughLineSegments(gray, accumulatorB, thresholdTValue, segmentValue, gapValue);
                                     // Visualize most salient line segments in red
