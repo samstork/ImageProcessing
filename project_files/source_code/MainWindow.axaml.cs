@@ -16,8 +16,8 @@ namespace ImageApp
         private byte[,,]? _loadedColorPixels; // [x, y, channel] with channel 0=R, 1=G, 2=B -- extracted once at load time
         private byte[,,]? _loadedColorRef; // [x, y, channel] with channel 0=R, 1=G, 2=B -- extracted once at load time
 
-        private byte[,]? _processedGray; // Processed grayscale values (nullable)
-        private byte[,]? _processedGrayRef; // Processed grayscale values (nullable)
+        object? _processedResult; // Processed grayscale values (nullable)
+        private byte[,]? _processedResultRef; // Processed grayscale values (nullable)
 
 
         // Simple fixed defaults used by the functions below until you add your own
@@ -96,6 +96,31 @@ namespace ImageApp
             SharpenBox.Value = 1; 
         }
 
+        private WriteableBitmap ColorArrayToBitmap(byte[,,] color)
+        {
+            int w = color.GetLength(0);
+            int h = color.GetLength(1);
+            var bmp = new WriteableBitmap(new PixelSize(w, h), new(96, 96), PixelFormat.Rgba8888,
+            AlphaFormat.Opaque);
+            using var fb = bmp.Lock();
+            byte[] buffer = new byte[fb.RowBytes * h];
+            for (int y = 0; y < h; y++)
+                {
+                int rowStart = y * fb.RowBytes;
+                for (int x = 0; x < w; x++)
+                {
+                    int idx = rowStart + x * 4;
+                    buffer[idx + 0] = color[x, y, 0]; // R
+                    buffer[idx + 1] = color[x, y, 1]; // G
+                    buffer[idx + 2] = color[x, y, 2]; // B
+                    buffer[idx + 3] = 255;
+                }
+            }
+            Marshal.Copy(buffer, 0, fb.Address, buffer.Length);
+            return bmp;
+        }
+
+
         /// <summary>
         /// Opens a file picker dialog, loads the selected image, and extracts its color pixel data.
         /// </summary>
@@ -158,7 +183,7 @@ namespace ImageApp
                     }
                 }
 
-                _processedGray = null;
+                _processedResult = null;
                 (OriginalImage.Source as IDisposable)?.Dispose();
                 OriginalImage.Source = _loadedBitmap;
                 (ProcessedImage.Source as IDisposable)?.Dispose();
@@ -230,7 +255,7 @@ namespace ImageApp
                     }
                 }
 
-                _processedGrayRef = null;
+                _processedResultRef = null;
                 StatusText.Text = $"Loaded reference ({width} \u00d7 {height} px).";
             }
             catch (Exception ex)
@@ -244,7 +269,7 @@ namespace ImageApp
         /// </summary>
         private async void OnSaveImage(object? sender, RoutedEventArgs e)
         {
-            if (_processedGray == null)
+            if (_processedResult == null)
             {
                 StatusText.Text = "No processed image to save. Apply an operation first.";
                 return;
@@ -271,7 +296,13 @@ namespace ImageApp
                 if (file == null)
                     return;
 
-                using var bmp = ByteArrayToBitmap(_processedGray);
+                using WriteableBitmap bmp = _processedResult switch
+                {
+                    byte[,,] colorImg => ColorArrayToBitmap(colorImg),
+                    byte[,] grayImg => ByteArrayToBitmap(grayImg),
+                    _ => throw new NotSupportedException()
+                };
+
                 await using var stream = await file.OpenWriteAsync();
                 bmp.Save(stream);
                 StatusText.Text = "Processed image saved successfully.";
@@ -333,6 +364,10 @@ namespace ImageApp
                     // operation always starts from the original loaded image, never chained
                     // from a previous Apply's result.
                     byte[,] gray = ConvertToGrayscale(colorPixels);
+
+                    // default: stays grayscale (ConvertToGrayscale case needs no reassignment)
+                    object result = gray;
+
                     int image_width = gray.GetLength(0);
                     int image_height = gray.GetLength(1);
 
@@ -344,87 +379,87 @@ namespace ImageApp
                                     // so nothing further is needed here.
                                     break;
                                 case ProcessingFunctions.InvertImage:
-                                    gray = InvertImage(gray);
+                                    result = InvertImage(gray);
                                     break;
                                 case ProcessingFunctions.AdjustContrast:
-                                    gray = AdjustContrast(gray);
+                                    result = AdjustContrast(gray);
                                     break;
                                 case ProcessingFunctions.ConvolveImage:
-                                    gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+                                    result = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
                                     break;
                                 case ProcessingFunctions.MedianFilter:
-                                    gray = MedianFilter(gray, 5);
+                                    result = MedianFilter(gray, 5);
                                     break;
                                 case ProcessingFunctions.EdgeMagnitude:
                                 {
-                                    gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
+                                    result = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
                                     break;
                                 }
                                 case ProcessingFunctions.ThresholdImage:
-                                    gray = ThresholdImage(gray, thresholdValue);
+                                    result = ThresholdImage(gray, thresholdValue);
                                     break;
 
                                 case ProcessingFunctions.BinaryErodeImage:
                                 {
-                                    gray = BinaryErodeImage(gray, _plusStructElem);
+                                    result = BinaryErodeImage(gray, _plusStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.BinaryDilateImage:
                                 {
-                                    gray = BinaryDilateImage(gray, _plusStructElem);
+                                    result = BinaryDilateImage(gray, _plusStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.BinaryOpenImage:
                                 {
-                                    gray = BinaryOpenImage(gray, _plusStructElem);
+                                    result = BinaryOpenImage(gray, _plusStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.BinaryCloseImage:
                                 {
-                                    gray = BinaryCloseImage(gray, _plusStructElem);
+                                    result = BinaryCloseImage(gray, _plusStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.GrayscaleErodeImage:
                                 {
                                     int[,] grayStructElem = new int[5,5];
-                                    gray = GrayscaleErodeImage(gray, grayStructElem);
+                                    result = GrayscaleErodeImage(gray, grayStructElem);
                                     break;
                                 }
 
                                 case ProcessingFunctions.GrayscaleDilateImage:
                                 {
                                     int[,] grayStructElem = new int[5,5];
-                                    gray = GrayscaleDilateImage(gray, grayStructElem);
+                                    result = GrayscaleDilateImage(gray, grayStructElem);
                                     break;
                                 }
                                 case ProcessingFunctions.EdgeSharpen:
                                 {
                                     byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
 
-                                    gray = Sharpen(gray, mask, thresholdValue, sharpenValue);
+                                    result = Sharpen(gray, mask, thresholdValue, sharpenValue);
                                     break;
                                 }
                                 case ProcessingFunctions.Task1:
                                 {
                                     if (selectedFilter == FilterOptions.Gaussian)
                                     {
-                                        gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+                                        result = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
 
                                     } else if (selectedFilter == FilterOptions.Median)
                                     {
-                                        gray = MedianFilter(gray, kernelSize);
+                                        result = MedianFilter(gray, kernelSize);
                                     } 
-                                    gray = Task1Pipeline(gray, thresholdValue);
+                                    result = Task1Pipeline(gray, thresholdValue);
                                     break;
                                 }
                                 case ProcessingFunctions.Task2:
                                 {
                                     int[,] grayStructElem = new int[kernelSize,kernelSize];
-                                    gray = GrayscaleErodeImage(gray, grayStructElem);
+                                    result = GrayscaleErodeImage(gray, grayStructElem);
                                     break;
                                 }
                                 case ProcessingFunctions.Task3:
@@ -435,7 +470,7 @@ namespace ImageApp
                                     {
                                         structElem[i,j] = true;
                                     }
-                                    gray = BinaryCloseImage(gray, structElem);
+                                    result = BinaryCloseImage(gray, structElem);
                                     break;
                                 }
                                 case ProcessingFunctions.HistogramCheck:
@@ -452,12 +487,12 @@ namespace ImageApp
                                     }
                                     byte[,,] colorRef = _loadedColorRef;
                                     byte[,] grayRef = ConvertToGrayscale(colorRef);
-                                    gray = MatchHistograms(gray, grayRef);
+                                    result = MatchHistograms(gray, grayRef);
                                     break;
                                 }
                                 case ProcessingFunctions.SequentialRegionLabeling:
                                 {
-                                    gray = sequentialRegionLabeling(gray);
+                                    result = sequentialRegionLabeling(gray);
                                     break;
                                 }
                                 case ProcessingFunctions.HoughTransform:
@@ -471,23 +506,29 @@ namespace ImageApp
                                     }
                                     int[,] output = HoughTransformer.HoughTransform(gray, is_binary, 360, 360);
                                     gray = IntToByte(output);
-                                    gray = AdjustContrast(gray);
+                                    result = AdjustContrast(gray);
                                     break; 
                                 }
                                 case ProcessingFunctions.HoughPeaks:
                                 {
-                                    gray = HoughTransformer.HoughPeaks(gray, thresholdValue);
+                                    result = HoughTransformer.HoughPeaks(gray, thresholdValue);
                                     break;
                                 }
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
                             }
 
-                    var bmp = ByteArrayToBitmap(gray);
+                    WriteableBitmap bmp = result switch
+                    {
+                        byte[,,] colorImg => ColorArrayToBitmap(colorImg),
+                        byte[,] grayImg => ByteArrayToBitmap(grayImg),
+                        _ => throw new NotSupportedException()
+                    };
+
                     return (gray, bmp);
                 });
 
-                _processedGray = resultGray;
+                _processedResult = resultGray;
                 (ProcessedImage.Source as IDisposable)?.Dispose();
                 ProcessedImage.Source = resultBmp;
                 StatusText.Text = newStatusText;
