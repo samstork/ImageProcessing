@@ -68,6 +68,7 @@ namespace ImageApp
             HistogramCheck,
             HistogramMatch,
             SequentialRegionLabeling,
+            FloodFill,
             HoughTransform,
             HoughPeaks,
             HoughLineSegments,
@@ -524,6 +525,11 @@ namespace ImageApp
                                 case ProcessingFunctions.SequentialRegionLabeling:
                                 {
                                     result = sequentialRegionLabeling(gray);
+                                    break;
+                                }
+                                case ProcessingFunctions.FloodFill:
+                                {
+                                    result = floodFill(gray);
                                     break;
                                 }
                                 case ProcessingFunctions.HoughTransform:
@@ -1390,7 +1396,59 @@ namespace ImageApp
             output = AdjustContrast(output);
 
             return output;
-        }
+        }// Sequential region labeling.
+
+        /// <summary>
+        ///  Performs flood fill on the binary input image.
+        /// </summary>
+        /// <param name="inputImage">The 2D input binary image.</param>
+        /// <returns>A new 2D grayscale image with labeled regions.</returns>
+        private byte[,] floodFill(byte[,] inputImage)
+        {
+            int x = inputImage.GetLength(0);
+            int y = inputImage.GetLength(1);
+            byte[,] output = new byte[x,y];
+
+            byte colour = 2;
+
+            // For all pixels.
+            for (int i = 0; i<x; i++)
+            for (int j = 0; j<y; j++)
+            {
+                if (inputImage[i,j]!=255) continue;
+                if (output[i,j]!=0) continue;
+
+                // Use recursion to fill out the entire object.
+                floodFillRecursive(inputImage, output, i, j, colour);
+                colour++;   
+            }
+
+            output = AdjustContrast(output);
+            return output;
+        }// Flood Fill
+
+        /// <summary>
+        /// Fill all connected foreground pixels using recursion.
+        /// </summary>
+        private void floodFillRecursive(byte[,] inputImage, byte[,] output, 
+                                        int i, int j, byte colour)
+        {
+            int x = inputImage.GetLength(0);
+            int y = inputImage.GetLength(1);
+            if ((i<0)||(i>=x)||(j<0)||j>=y) return;// Skip if out of bounds
+            if (inputImage[i,j]==0) return;// Skip if its a background pixel.
+            if (output[i,j]!=0) return;// Skip if pixel is already labeled
+
+            output[i,j] = colour;
+
+            // Visit all neighbouring pixels
+            foreach (int row in new[] {i-1, i, i+1})
+            foreach (int column in new[] {j-1,j,j+1})
+            {
+                if ((row==i)&&(column==j)) continue;
+                floodFillRecursive(inputImage, output, row, column, colour);
+            }
+        }// floodFillRecursive
 
         // ====================================================================
         // ==================== IMAGE <-> BITMAP HELPERS (given) =============
