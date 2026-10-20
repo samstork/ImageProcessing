@@ -72,6 +72,7 @@ namespace ImageApp
             HoughPeaks,
             BinaryPipeline,
             HoughLineSegments,
+            Norm,
         }
         
         private enum FilterOptions
@@ -506,6 +507,11 @@ namespace ImageApp
                                         if ((gray[i,j]!=0)&&(gray[i,j]!=255)) is_binary = false;
                                     }
                                     int[,] output = HoughTransformer.HoughTransform(gray, is_binary, 360, 360);
+=======
+                                    // TODO: add binary detection. Contrast adjustment for check but not for hough transform 
+                                    bool isBinary = IsBinary(gray);
+                                    int[,] output = HoughTransformer.HoughTransform(gray, isBinary, 360, 360);
+>>>>>>> Stashed changes
                                     gray = IntToByte(output);
                                     result = AdjustContrast(gray);
                                     break; 
@@ -536,7 +542,9 @@ namespace ImageApp
                                 }
                                 case ProcessingFunctions.HoughLineSegments:
                                 {
-                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, true, 360, 360);
+                                    bool isBinary = IsBinary(gray);
+                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, IsBinary(gray), 360, 360);
+                                    // accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, isBinary);
                                     byte[,] accumulatorB = IntToByte(accumulator);
                                     accumulatorB = AdjustContrast(accumulatorB);
                                     accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdValue);
@@ -544,6 +552,14 @@ namespace ImageApp
                                     result = HoughTransformer.VisualiseSegments(gray, segments);
                                     break;
                                 }   
+                                case ProcessingFunctions.Norm:
+                                {
+                                    bool binary = IsBinary(gray);
+                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, binary, 360, 360);
+                                    accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, binary);
+                                    result = AdjustContrast(IntToByte(accumulator));
+                                    break;
+                                }
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
                             }
@@ -605,7 +621,17 @@ namespace ImageApp
         // ==================== FUNCTIONS TO IMPLEMENT =======================
         // ====================================================================
 
-
+        private static bool IsBinary(byte[,] gray)
+        {
+            int w = gray.GetLength(0);
+            int h = gray.GetLength(1);
+            for (int i = 0; i < w; i++)
+            for (int j = 0; j < h; j++)
+            {
+                if ((gray[i,j]!=0)&&(gray[i,j]!=255)) return false;
+            }
+            return true;
+        }
         private static byte[,] Task1Pipeline(byte[,] gray, byte thresholdValue)
         {
             gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);

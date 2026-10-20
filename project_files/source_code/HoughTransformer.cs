@@ -13,11 +13,14 @@ namespace ImageApp
 		/// <param name="dNumber">The number of possible r. Step size = diagonal
         /// <returns>A 2D array of grayscale integer intensities with values.</returns>
 		public static int[,] HoughTransform(byte[,] inputImage, bool binary, int kNumber, int dNumber) {
+
+
 			int w = inputImage.GetLength(0);
 			int h = inputImage.GetLength(1);
 			int[,] accumulator = new int[kNumber, dNumber];
 			int xCentre = w/2;
 			int yCentre = h/2;
+
 			// Make it even if it's not to find an integer center adjustment
 			dNumber += dNumber%2;
 			int dCentre = dNumber/2;
@@ -64,6 +67,32 @@ namespace ImageApp
 			return accumulator;
 		}
 
+		public static int[,] NormaliseAccumulator(byte[,] inputImage, int[,] accumulator, bool binary)
+		{
+			int kNumber = accumulator.GetLength(0);
+            int dNumber = accumulator.GetLength(1);	
+			int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+			int[,] output = new int[kNumber, dNumber];
+			byte[,] white = new byte[w,h];
+			for(int x=0; x<w; x++)
+			for(int y=0; y<h; y++)
+			{
+				white[x,y] = byte.MaxValue;
+			}
+			int[,] maxValues = HoughTransform(white, binary, kNumber, dNumber);
+
+			for(int x=0; x<kNumber; x++)
+			for(int y=0; y<dNumber; y++)
+			{
+				if(maxValues[x,y] > 0)
+				{
+					output[x,y] = byte.MaxValue * accumulator[x,y] / maxValues[x,y];
+				}
+			}
+			return output;
+
+		}
 		public static byte[,] HoughPeaks(byte[,] accumulator, int peak_threshold)
 		{
 			int w = accumulator.GetLength(0);
@@ -142,9 +171,9 @@ namespace ImageApp
         }
 
 		public static List<List<(int x, int y)>> HoughLineSegments(byte[,] edgeImage, byte[,] peaks, 
-			byte threshold = 0, 
-			int minSegmentLength = 0, 
-			int maxGapLength = 0)
+																	byte threshold = 0, 
+																	int minSegmentLength = 50, 
+																	int maxGapLength = 25)
 		{
 			int w = edgeImage.GetLength(0);
 			int h = edgeImage.GetLength(1);
