@@ -500,18 +500,9 @@ namespace ImageApp
                                 }
                                 case ProcessingFunctions.HoughTransform:
                                 {
-                                    bool is_binary = true;
-                                    for (int i = 0; i < image_width; i++)
-                                    for (int j = 0; j < image_height; j++)
-                                    {
-                                        if ((gray[i,j]!=0)&&(gray[i,j]!=255)) is_binary = false;
-                                    }
-                                    int[,] output = HoughTransformer.HoughTransform(gray, is_binary, 360, 360);
-=======
                                     // TODO: add binary detection. Contrast adjustment for check but not for hough transform 
                                     bool isBinary = IsBinary(gray);
                                     int[,] output = HoughTransformer.HoughTransform(gray, isBinary, 360, 360);
->>>>>>> Stashed changes
                                     gray = IntToByte(output);
                                     result = AdjustContrast(gray);
                                     break; 
