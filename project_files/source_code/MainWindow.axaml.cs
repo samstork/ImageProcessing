@@ -72,6 +72,7 @@ namespace ImageApp
             HoughPeaks,
             HoughLineSegments,
             BinaryPipeline,
+            GrayscalePipeline,
             Norm,
         }
         
@@ -570,7 +571,23 @@ namespace ImageApp
                                     result = HoughTransformer.VisualiseSegments(gray, segments);
                                     break;
                                 }
-
+                                case ProcessingFunctions.GrayscalePipeline:
+                                {
+                                    // Gaussion Smoothing
+                                    gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+                                    // Detect edges
+                                    gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
+                                    // Perform Hough transform (grayscale)
+                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, false, kValue, dValue);
+                                    // Pick out the most salient line fragments
+                                    byte[,] accumulatorB = IntToByte(accumulator);
+                                    accumulatorB = AdjustContrast(accumulatorB);
+                                    accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdSValue);
+                                    List<List<(int x, int y)>> segments = HoughTransformer.HoughLineSegments(gray, accumulatorB);
+                                    // Visualize most salient line segments in red
+                                    result = HoughTransformer.VisualiseSegments(gray, segments);
+                                    break;
+                                }
                                 case ProcessingFunctions.Norm:
                                 {
                                     bool binary = IsBinary(gray);
