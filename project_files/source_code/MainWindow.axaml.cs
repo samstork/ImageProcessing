@@ -70,6 +70,7 @@ namespace ImageApp
             SequentialRegionLabeling,
             HoughTransform,
             HoughPeaks,
+            BinaryPipeline,
         }
         
         private enum FilterOptions
@@ -497,7 +498,6 @@ namespace ImageApp
                                 }
                                 case ProcessingFunctions.HoughTransform:
                                 {
-                                    // TODO: add binary detection. Contrast adjustment for check but not for hough transform 
                                     bool is_binary = true;
                                     for (int i = 0; i < image_width; i++)
                                     for (int j = 0; j < image_height; j++)
@@ -514,6 +514,21 @@ namespace ImageApp
                                     result = HoughTransformer.HoughPeaks(gray, thresholdValue);
                                     break;
                                 }
+                                case ProcessingFunctions.BinaryPipeline:
+                                {
+                                    // Gaussion Smoothing
+                                    gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue))
+                                    // Detect edges
+                                    gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
+                                    // Apply threshold (t_mag)
+                                    gray = ThresholdImage(gray, thresholdValue);
+                                    // Perform Hough transform (binary)
+                                    gray = HoughTransformer.HoughTransform(gray, true, 360, 360);
+                                    // Visualize most salient line segments in red
+                                    // TODO
+                                    result = gray;
+                                    break;
+                                }
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
                             }
@@ -525,7 +540,7 @@ namespace ImageApp
                         _ => throw new NotSupportedException()
                     };
 
-                    return (gray, bmp);
+                    return (result, bmp);
                 });
 
                 _processedResult = resultGray;
