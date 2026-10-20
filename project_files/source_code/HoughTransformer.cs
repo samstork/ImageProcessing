@@ -140,5 +140,117 @@ namespace ImageApp
 
             return output;
         }
+
+		public static List<List<(int x, int y)>> HoughLineSegments(byte[,] edgeImage, byte[,] peaks, 
+			byte threshold = 0, 
+			int minSegmentLength = 0, 
+			int maxGapLength = 0)
+		{
+			int w = edgeImage.GetLength(0);
+			int h = edgeImage.GetLength(1);
+			int xCentre = w/2;
+			int yCentre = h/2;
+
+			int kNumber = peaks.GetLength(0);
+			int dNumber = peaks.GetLength(1);
+			int dCentre = dNumber/2;
+
+			float dDistancePix = (float)Math.Sqrt(w*w + h*h) / dNumber;
+			float kAngleRad = (float)Math.PI/kNumber;
+
+			double cosine, sine;
+			double sqrt2 = Math.Sqrt(2)/2;
+
+			List<(int x, int y)> segment = new List<(int x, int y)>();
+			List<List<(int x, int y)>> segmentList = new List<List<(int x, int y)>>();
+
+			bool debug = false;
+			int x, y, gapCounter;
+			float r;
+			for (int theta_raw = 0; theta_raw<kNumber; theta_raw++)
+            for (int r_raw = 0; r_raw<dNumber; r_raw++)
+			{
+				if(peaks[theta_raw, r_raw] == 0) continue;
+				segment.Clear();
+				sine = Math.Sin(theta_raw * kAngleRad);
+				cosine = Math.Cos(theta_raw * kAngleRad);
+				r = (r_raw - dCentre) * dDistancePix;
+				gapCounter = -1;
+				if (Math.Abs(sine) >= sqrt2)
+				{
+					for (x = 0; x<w; x++)
+					{
+						y = (int)Math.Round((r - (x-xCentre) * cosine)/sine) + yCentre;
+						if(!(0 <= y && y < h)) continue;
+						if(edgeImage[x, y] > threshold || debug)
+						{
+							gapCounter = 0;
+							segment.Add((x, y));
+						} else if (gapCounter >= 0 && gapCounter < maxGapLength)
+						{
+							segment.Add((x, y));
+							gapCounter ++;
+						} else if (gapCounter >= maxGapLength)
+						{
+							segment.RemoveRange(segment.Count-gapCounter, gapCounter);
+							if (segment.Count >= minSegmentLength) segmentList.Add([.. segment]);
+							gapCounter = -1;
+							segment.Clear();
+						}
+
+					}
+				} else
+				{
+					for (y = 0; y<h; y++)
+					{
+						x = (int)Math.Round((r - (y-yCentre) * sine)/cosine) + xCentre;
+						if(!(0 <= x && x < w)) continue;
+						if(edgeImage[x, y] > threshold || debug)
+						{
+							gapCounter = 0;
+							segment.Add((x, y));
+						} else if (gapCounter >= 0 && gapCounter < maxGapLength)
+						{
+							segment.Add((x, y));
+							gapCounter ++;
+						} else if (gapCounter >= maxGapLength)
+						{
+							segment.RemoveRange(segment.Count-gapCounter, gapCounter);
+							if (segment.Count >= minSegmentLength) segmentList.Add([.. segment]);
+							gapCounter = -1;
+							segment.Clear();
+						}
+					}
+				}
+				if(gapCounter > 0) segment.RemoveRange(segment.Count-gapCounter, gapCounter);
+				if (segment.Count >= minSegmentLength) segmentList.Add([.. segment]);
+			}
+			return segmentList;
+		}
+		public static byte[,,] VisualiseSegments(byte[,] edgeImage, List<List<(int x, int y)>> segmentList)
+		{
+			int w = edgeImage.GetLength(0);
+			int h = edgeImage.GetLength(1);
+			byte[,,] output = new byte[w,h,3];
+			for(int x = 0; x<w; x++)
+			for(int y = 0; y<h; y++)
+			{
+				output[x,y,0] = edgeImage[x,y];
+				output[x,y,1] = edgeImage[x,y];
+				output[x,y,2] = edgeImage[x,y];
+			}
+
+			foreach(List<(int x, int y)> segment in segmentList)
+			{
+				foreach((int x, int y) coords in segment)
+				{
+					output[coords.x, coords.y, 0] = byte.MaxValue;
+					output[coords.x, coords.y, 1] = 0;
+					output[coords.x, coords.y, 2] = 0;
+				}
+			}
+
+			return output;
+		}
 	} 
 }
