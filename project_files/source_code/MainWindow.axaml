@@ -5,7 +5,7 @@
         MinWidth="800" MinHeight="500"
         Title="Image Processing Assignment">
 
-  <Grid RowDefinitions="*, Auto, Auto, Auto" Margin="10">
+  <Grid RowDefinitions="*, Auto, Auto, Auto, Auto" Margin="10">
 
     <!-- Side-by-side images -->
     <Grid Grid.Row="0" ColumnDefinitions="*,*" Margin="0,0,0,10">
@@ -63,15 +63,31 @@
         <TextBlock Text="Sigma:" VerticalAlignment="Center"/>
         <NumericUpDown x:Name = "SigmaBox" Minimum = "0" Maximum="15" MinWidth = "120" FormatString = "0.00" Increment = "0.01"/>
 
-        <TextBlock Text="Threshold:" VerticalAlignment="Center" />
-        <NumericUpDown x:Name = "ThresholdBox" Minimum = "0" Maximum="255" MinWidth = "120" FormatString = "0"/>
+
 
         <TextBlock Text="Sharpening Amount:" VerticalAlignment="Center" />
         <NumericUpDown x:Name = "SharpenBox" Minimum = "0.0" Maximum="2.0" MinWidth = "120" FormatString = "0.00" Increment = "0.1"/>
 
       </StackPanel>
+      <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="10" Margin="0,0,0,4" VerticalAlignment="Center">
+        <TextBlock Text="Threshold (0):" VerticalAlignment="Center" />
+        <NumericUpDown x:Name = "ThresholdBox" Minimum = "0" Maximum="255" MinWidth = "120" FormatString = "0"/>
+        <TextBlock Text="Threshold (1):" VerticalAlignment="Center" />
+        <NumericUpDown x:Name = "ThresholdSBox" Minimum = "0" Maximum="255" MinWidth = "120" FormatString = "0"/>
+        <TextBlock Text="Threshold (2):" VerticalAlignment="Center" />
+        <NumericUpDown x:Name = "ThresholdTBox" Minimum = "0" Maximum="255" MinWidth = "120" FormatString = "0"/>
+        <TextBlock Text="k bins:" VerticalAlignment="Center" />
+        <NumericUpDown x:Name = "kBox" Minimum = "0" Maximum="999" MinWidth = "120" FormatString = "0"/>
+        <TextBlock Text="d bins:" VerticalAlignment="Center" />
+        <NumericUpDown x:Name = "dBox" Minimum = "0" Maximum="999" MinWidth = "120" FormatString = "0"/>
+        <TextBlock Text="Min Line:" VerticalAlignment="Center" />
+        <NumericUpDown x:Name = "SegmentBox" Minimum = "0" Maximum="999" MinWidth = "120" FormatString = "0"/>
+        <TextBlock Text="Max Gap:" VerticalAlignment="Center" />
+        <NumericUpDown x:Name = "MaxGapBox" Minimum = "0" Maximum="999" MinWidth = "120" FormatString = "0"/>
+      </StackPanel>
+      
 
-    <TextBlock Grid.Row="3" x:Name="StatusText" Text="" TextWrapping="Wrap" Margin="0,4,0,0"/>
+    <TextBlock Grid.Row="4" x:Name="StatusText" Text="" TextWrapping="Wrap" Margin="0,4,0,0"/>
 
   </Grid>
 </Window>

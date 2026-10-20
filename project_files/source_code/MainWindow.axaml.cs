@@ -70,8 +70,8 @@ namespace ImageApp
             SequentialRegionLabeling,
             HoughTransform,
             HoughPeaks,
-            BinaryPipeline,
             HoughLineSegments,
+            BinaryPipeline,
             Norm,
         }
         
@@ -94,6 +94,15 @@ namespace ImageApp
             
             SigmaBox.Value = 1;
             ThresholdBox.Value = 120;
+
+            MaxGapBox.Value = 25;
+            SegmentBox.Value = 50;
+
+            kBox.Value = 360;
+            dBox.Value = 360;
+
+            ThresholdSBox.Value = 150;
+            ThresholdTBox.Value = 150;
 
             KernelBox.Value = 5;
             SharpenBox.Value = 1; 
@@ -346,6 +355,24 @@ namespace ImageApp
             byte thresholdValue = 120;
             if (!(ThresholdBox.Value==null)) thresholdValue = (byte)ThresholdBox.Value;
             
+            byte thresholdSValue = 120;
+            if (!(ThresholdSBox.Value==null)) thresholdSValue = (byte)ThresholdSBox.Value;
+
+            byte thresholdTValue = 120;
+            if (!(ThresholdTBox.Value==null)) thresholdTValue = (byte)ThresholdTBox.Value;
+
+            int kValue = 360;
+            if (!(kBox.Value==null)) kValue = (int)kBox.Value;
+            
+            int dValue = 360;
+            if (!(dBox.Value==null)) dValue = (int)dBox.Value;
+
+            int gapValue = 25;
+            if (!(MaxGapBox.Value==null)) gapValue = (int)MaxGapBox.Value;
+
+            int segmentValue = 50;
+            if (!(SegmentBox.Value==null)) gapValue = (int)SegmentBox.Value;
+
             byte kernelSize = 3;
             if (!(KernelBox==null)) kernelSize = (byte)KernelBox.Value;
             
@@ -512,6 +539,18 @@ namespace ImageApp
                                     result = HoughTransformer.HoughPeaks(gray, thresholdValue);
                                     break;
                                 }
+                                case ProcessingFunctions.HoughLineSegments:
+                                {
+                                    bool isBinary = IsBinary(gray);
+                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, IsBinary(gray), kValue, dValue);
+                                    // accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, isBinary);
+                                    byte[,] accumulatorB = IntToByte(accumulator);
+                                    accumulatorB = AdjustContrast(accumulatorB);
+                                    accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdValue);
+                                    List<List<(int x, int y)>> segments = HoughTransformer.HoughLineSegments(gray, accumulatorB, thresholdTValue, segmentValue, gapValue);
+                                    result = HoughTransformer.VisualiseSegments(gray, segments);
+                                    break;
+                                }   
                                 case ProcessingFunctions.BinaryPipeline:
                                 {
                                     // Gaussion Smoothing
@@ -521,28 +560,17 @@ namespace ImageApp
                                     // Apply threshold (t_mag)
                                     gray = ThresholdImage(gray, thresholdValue);
                                     // Perform Hough transform (binary)
-                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, true, 360, 360);
+                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, true, kValue, dValue);
                                     // Pick out the most salient line fragments
                                     byte[,] accumulatorB = IntToByte(accumulator);
                                     accumulatorB = AdjustContrast(accumulatorB);
-                                    accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdValue);
+                                    accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdSValue);
                                     List<List<(int x, int y)>> segments = HoughTransformer.HoughLineSegments(gray, accumulatorB);
                                     // Visualize most salient line segments in red
                                     result = HoughTransformer.VisualiseSegments(gray, segments);
                                     break;
                                 }
-                                case ProcessingFunctions.HoughLineSegments:
-                                {
-                                    bool isBinary = IsBinary(gray);
-                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, IsBinary(gray), 360, 360);
-                                    // accumulator = HoughTransformer.NormaliseAccumulator(gray, accumulator, isBinary);
-                                    byte[,] accumulatorB = IntToByte(accumulator);
-                                    accumulatorB = AdjustContrast(accumulatorB);
-                                    accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdValue);
-                                    List<List<(int x, int y)>> segments = HoughTransformer.HoughLineSegments(gray, accumulatorB);
-                                    result = HoughTransformer.VisualiseSegments(gray, segments);
-                                    break;
-                                }   
+
                                 case ProcessingFunctions.Norm:
                                 {
                                     bool binary = IsBinary(gray);
