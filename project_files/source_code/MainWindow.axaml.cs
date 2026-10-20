@@ -518,16 +518,20 @@ namespace ImageApp
                                 case ProcessingFunctions.BinaryPipeline:
                                 {
                                     // Gaussion Smoothing
-                                    gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue))
+                                    gray = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
                                     // Detect edges
                                     gray = EdgeMagnitude(gray, _horizontalKernel, _verticalKernel);
                                     // Apply threshold (t_mag)
                                     gray = ThresholdImage(gray, thresholdValue);
                                     // Perform Hough transform (binary)
-                                    gray = HoughTransformer.HoughTransform(gray, true, 360, 360);
+                                    int[,] accumulator = HoughTransformer.HoughTransform(gray, true, 360, 360);
+                                    // Pick out the most salient line fragments
+                                    byte[,] accumulatorB = IntToByte(accumulator);
+                                    accumulatorB = AdjustContrast(accumulatorB);
+                                    accumulatorB = HoughTransformer.HoughPeaks(accumulatorB, thresholdValue);
+                                    List<List<(int x, int y)>> segments = HoughTransformer.HoughLineSegments(gray, accumulatorB);
                                     // Visualize most salient line segments in red
-                                    // TODO
-                                    result = gray;
+                                    result = HoughTransformer.VisualiseSegments(gray, segments);
                                     break;
                                 }
                                 case ProcessingFunctions.HoughLineSegments:
