@@ -69,6 +69,7 @@ namespace ImageApp
             HistogramMatch,
             SequentialRegionLabeling,
             HoughTransform,
+            HoughPeaks,
         }
         
         private enum FilterOptions
@@ -470,7 +471,13 @@ namespace ImageApp
                                     }
                                     int[,] output = HoughTransformer.HoughTransform(gray, is_binary, 360, 360);
                                     gray = IntToByte(output);
+                                    gray = AdjustContrast(gray);
                                     break; 
+                                }
+                                case ProcessingFunctions.HoughPeaks:
+                                {
+                                    gray = HoughTransformer.HoughPeaks(gray, thresholdValue);
+                                    break;
                                 }
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");

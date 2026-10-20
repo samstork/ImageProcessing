@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace ImageApp
 {
 	public static class HoughTransformer
@@ -9,7 +11,7 @@ namespace ImageApp
 		/// <param name="binary">Whether the image is binary.</param>
 		/// <param name="kNumber">The number of theta to check. Theta step = 2pi/kNumber. Width of output.</param>
 		/// <param name="dNumber">The number of possible r. Step size = diagonal
-        /// <returns>A 2D array of grayscale integer intensities with values in [0, 255].</returns>
+        /// <returns>A 2D array of grayscale integer intensities with values.</returns>
 		public static int[,] HoughTransform(byte[,] inputImage, bool binary, int kNumber, int dNumber) {
 			int w = inputImage.GetLength(0);
 			int h = inputImage.GetLength(1);
@@ -62,5 +64,81 @@ namespace ImageApp
 			return accumulator;
 		}
 
+		public static byte[,] HoughPeaks(byte[,] accumulator, int peak_threshold)
+		{
+			int w = accumulator.GetLength(0);
+            int h = accumulator.GetLength(1);
+			byte[,] output = NonMaxSuppression(accumulator);
+
+			for (int i = 0; i<w; i++)
+            for (int j = 0; j<h; j++)
+			{
+				if(output[i,j] < peak_threshold)
+				{
+					output[i,j] = 0;
+				} else
+				{
+					output[i,j] = byte.MaxValue;
+				}
+			}
+			return output;
+		}
+
+		private static byte[,] NonMaxSuppression(byte[,] inputImage)
+        {
+            int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+
+            byte[,] output = new byte[w,h];
+
+			bool[,] plusStruct =
+			{
+				{ false, true,  false },
+				{ true,  false,  true  },
+				{ false, true,  false }  
+			};
+			
+			bool localMax;
+            // For all pixels in the input image.
+            for (int i = 0; i<w; i++)
+            for (int j = 0; j<h; j++)
+            {
+                if (inputImage[i,j] == 0) continue;
+				localMax = true;
+                // For all pixels in the structuring element.
+                for (int u = 0; u < 3; u++)
+                for (int v = 0; v < 3; v++)
+                {
+					if (!plusStruct[u,v]) continue;
+                    // Calculate the offset
+                    int x_offset = i+u-1;
+                    int y_offset = j+v-1;
+					
+					// Wrap x around like pacman
+					if (x_offset < 0)
+					{
+						x_offset += w;
+						y_offset = h - y_offset;
+					} else if (x_offset >= w)
+					{
+						x_offset -= w;
+						y_offset = h - y_offset;
+					} 
+
+                    // Check if the offset element is within the bounds of the image.
+                    if ((x_offset>=0) && (x_offset<w) && (y_offset>=0) && (y_offset<h))
+            		{
+                        if(inputImage[i, j] < inputImage[x_offset,y_offset])
+                        {
+                            localMax = false;
+							break; 
+                        }
+                    }
+                }
+				if (localMax) output[i, j] = inputImage[i,j];
+            }
+
+            return output;
+        }
 	} 
 }
