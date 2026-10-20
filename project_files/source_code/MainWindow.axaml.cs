@@ -332,6 +332,8 @@ namespace ImageApp
                     // operation always starts from the original loaded image, never chained
                     // from a previous Apply's result.
                     byte[,] gray = ConvertToGrayscale(colorPixels);
+                    int image_width = gray.GetLength(0);
+                    int image_height = gray.GetLength(1);
 
                         switch (selected)
                             {
@@ -460,7 +462,13 @@ namespace ImageApp
                                 case ProcessingFunctions.HoughTransform:
                                 {
                                     // TODO: add binary detection. Contrast adjustment for check but not for hough transform 
-                                    int[,] output = HoughTransformer.HoughTransform(gray, true, 360, 360);
+                                    bool is_binary = true;
+                                    for (int i = 0; i < image_width; i++)
+                                    for (int j = 0; j < image_height; j++)
+                                    {
+                                        if (gray[i,j]!=0)&&(gray[i,j]!=255) is_binary = false;
+                                    }
+                                    int[,] output = HoughTransformer.HoughTransform(gray, is_binary, 360, 360);
                                     gray = IntToByte(output);
                                     break; 
                                 }
