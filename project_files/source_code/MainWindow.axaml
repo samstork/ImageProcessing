@@ -84,6 +84,8 @@
         <NumericUpDown x:Name = "SegmentBox" Minimum = "0" Maximum="999" MinWidth = "120" FormatString = "0"/>
         <TextBlock Text="Max Gap:" VerticalAlignment="Center" />
         <NumericUpDown x:Name = "MaxGapBox" Minimum = "0" Maximum="999" MinWidth = "120" FormatString = "0"/>
+        <TextBlock Text="Norm:" VerticalAlignment="Center" />
+        <CheckBox x:Name = "NormBox" MinWidth = "30" IsChecked = "False" VerticalAlignment="Center"/>
       </StackPanel>
       
 

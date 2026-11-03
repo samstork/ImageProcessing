@@ -67,6 +67,61 @@ namespace ImageApp
 			return accumulator;
 		}
 
+		public static int[][,] HoughCircleTransform(byte[,] inputImage, bool binary, int kNumber, int dNumber, int minRadius, int maxRadius) {
+			int w = inputImage.GetLength(0);
+			int h = inputImage.GetLength(1);
+			int radiusInterval = maxRadius - minRadius;
+
+			int[][,] accumulator = new int[radiusInterval + 1][,];
+
+			// Compute maximum r (diagonal length of img) and divide by the number of d bins.
+			float kAngleRad = (float)Math.PI/kNumber;
+
+			// Since we're using the same theta values each loop, we can precompute the sines and cosines and just look them up.
+			float[] sines = new float[kNumber];
+			float[] cosines = new float[kNumber];
+			for (int i = 0; i < kNumber; i++)
+			{
+				sines[i] = (float)Math.Sin(kAngleRad * i);
+				cosines[i] = (float)Math.Cos(kAngleRad * i);
+			}
+
+			int a, b;
+			byte accumValue = 1;
+			for (int radius = 0; radius < radiusInterval; radius++)
+			{
+				accumulator[radius] = new int[w,h];
+				for (int x = 0; x<w; x++)
+				for (int y = 0; y<h; y++)
+				{
+					if (inputImage[x, y] == 0) continue;
+					if(!binary) accumValue = inputImage[x, y];
+					for (int theta = 0; theta < kNumber; theta++)
+					{
+						b = y - (int)Math.Round(sines[theta] * (radius + minRadius));
+						a = x - (int)Math.Round(cosines[theta] * (radius + minRadius));
+						if (0 <= b && b < h && 0 <= a && a < w)
+						{
+							accumulator[radius][a,b] += accumValue;
+						}
+
+					}
+
+				}
+			}
+			return accumulator;
+		}
+		// 	Pseudocode from wikipedia (Used as basis)
+		// For each A[a,b,r] = 0; // fill with zeroes initially, instantiate 3D matrix
+		//   For each cell(x,y)
+		//       For each theta t = 0 to 360  // the possible  theta 0 to 360
+		//          b = y – r * sin(t * PI / 180);  //polar coordinate for center (convert to radians)
+		//          a = x – r * cos(t * PI / 180); //polar coordinate for center (convert to radians)
+		//          A[a,b,r] +=1; //voting
+		//       end
+		//   end
+
+
 		public static int[,] NormaliseAccumulator(byte[,] inputImage, int[,] accumulator, bool binary)
 		{
 			int kNumber = accumulator.GetLength(0);
@@ -80,12 +135,21 @@ namespace ImageApp
 			{
 				white[x,y] = byte.MaxValue;
 			}
+			
 			int[,] maxValues = HoughTransform(white, binary, kNumber, dNumber);
+			// Ignore 5% smallest possible lines
+			int globalMaxim = 0;
+			for(int x=0; x<kNumber; x++)
+			for(int y=0; y<dNumber; y++)
+			{
+				if (globalMaxim < maxValues[x, y]) globalMaxim = maxValues[x,y];
+			}
+			int minimumIntensity = Math.Max((int)globalMaxim/20, 1);
 
 			for(int x=0; x<kNumber; x++)
 			for(int y=0; y<dNumber; y++)
 			{
-				if(maxValues[x,y] > 0)
+				if(maxValues[x,y] > minimumIntensity)
 				{
 					output[x,y] = byte.MaxValue * accumulator[x,y] / maxValues[x,y];
 				}
