@@ -5,6 +5,10 @@
     - Edge detection
 2. Features to recognise
     - Outer circle
-        - Hough
+        - Hough transform for ellipses
     - Outer boxy shape thing
     - Inner circles
+        - Hough transform for ellipses 
+        - Partially obscurred
+        - Check they're the in the right position using outer circle as guideline
+    - Outer square? 
