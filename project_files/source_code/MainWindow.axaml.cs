@@ -76,6 +76,7 @@ namespace ImageApp
             GrayscalePipeline,
             NormalizeAccumulator,
             HoughCircleTransform,
+            ObjectDetectionPipeline,
         }
         
         private enum FilterOptions
@@ -408,6 +409,9 @@ namespace ImageApp
 
                         switch (selected)
                             {
+                                case ProcessingFunctions.ObjectDetectionPipeline:
+                                    result = objectDetectionPipeline(gray);
+                                    break;
                                 case ProcessingFunctions.ConvertToGrayscale:
                                     // Already fully working; gray already holds the grayscale
                                     // conversion result at this point (computed above, before this switch),
@@ -680,6 +684,16 @@ namespace ImageApp
         // ==================== FUNCTIONS TO IMPLEMENT =======================
         // ====================================================================
 
+        // TODO 
+        private byte[,] objectDetectionPipeline (byte[,] gray)
+        {
+            int w = gray.GetLength(0);
+            int h = gray.GetLength(1);
+            byte[,] output = new byte[w,h];
+            output = AutoAdjustContrast(gray);
+            return output;
+        }// objectDetectionPipeline.
+
         private static bool IsBinary(byte[,] gray)
         {
             int w = gray.GetLength(0);
@@ -763,7 +777,86 @@ namespace ImageApp
                 tempImage[x, y] = (byte)Math.Floor((inputImage[x, y] - minValue) * contrastCoefficient);
             }
             return tempImage;
-        }
+        }// AdjustContrast
+
+        /// <summary>
+        /// Adjusts the contrast of the input grayscale image.
+        /// Values above max are mapped to 255, values below min are mapped to 0.
+        /// </summary>
+        /// <param name="inputImage">The 2D input grayscale image.</param>
+        /// <param name="min">The threshold % under which the pixels are mapped to 0.</param>
+        /// <param name="max">The threshold % above which the pixels are mapped to 255.</param>
+        /// <returns>A new 2D grayscale image with adjusted contrast.</returns>
+        private byte[,] AutoAdjustContrast(byte[,] inputImage, int min = 5, int max = 95)
+        {
+            // create temporary grayscale image
+            byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+
+            int w = tempImage.GetLength(0);
+            int h = tempImage.GetLength(1);
+
+            // Determine the values of Alow and Ahigh
+            // First calculate the accumulative pixel value
+            int[] histogram = new int[256];
+            int total_pixels = w*h;
+            for (int i = 0; i < w; i++)
+            for (int j = 0; j < h; j++)
+            {
+                histogram[inputImage[i,j]]++;
+            }
+            int[] accumulative_histogram = new int[256];
+            accumulative_histogram[0] = histogram[0];
+            for (int i = 1; i < 256; i++)
+            {
+                accumulative_histogram[i] = accumulative_histogram[i-1]+histogram[i];
+            }
+
+            // Now calculate the lower and upper threshold.
+            int lower_threshold = (int)(total_pixels*(min/100.0));
+            int upper_threshold = (int)(total_pixels*(max/100.0));
+
+            // Calculate the values for alow and ahigh
+            int a_low = -1;
+            int a_high = -1;
+            int iterator = 0;
+            while (a_low == -1)
+            {
+                if (accumulative_histogram[iterator]>=lower_threshold) a_low = iterator;
+                iterator++;
+                if (iterator > 255)
+                {
+                    a_low = 0;
+                    break;
+                }
+            }// while
+            iterator = 0;
+            while (a_high == -1)
+            {
+                if (accumulative_histogram[iterator] > upper_threshold) a_high = iterator ;
+                iterator++;
+                if (iterator > 255)
+                {
+                    a_high = 255;
+                    break;
+                }
+            }// while
+
+            float contrastCoefficient = 1f;
+            if (a_high - a_low > 0)
+            {
+                contrastCoefficient = (float)byte.MaxValue / (a_high - a_low);
+            }
+
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                if (inputImage[x,y]>=a_high) tempImage[x,y] = 255;
+                else if (inputImage[x,y]<=a_low) tempImage[x,y] = 0;
+                else tempImage[x, y] = (byte)Math.Clamp((int)Math.Round((inputImage[x,y] - a_low) * contrastCoefficient),0, 255);
+            }
+            return tempImage;
+        }// AutoAdjustContrast
+
         private byte[,] IntToByte(int[,] inputImage)
         {
             // create temporary grayscale image
