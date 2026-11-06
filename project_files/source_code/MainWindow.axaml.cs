@@ -684,13 +684,34 @@ namespace ImageApp
         // ==================== FUNCTIONS TO IMPLEMENT =======================
         // ====================================================================
 
-        // TODO 
+        // TODO : Figure out best parameters for the preprocessing.
         private byte[,] objectDetectionPipeline (byte[,] gray)
         {
             int w = gray.GetLength(0);
             int h = gray.GetLength(1);
             byte[,] output = new byte[w,h];
-            output = AutoAdjustContrast(gray);
+
+            // Parameters for the functions
+            byte kernelSize = 5; // Guassian blur size; higher = more smoothing, less noise
+            float sigmaValue = 1; // Guassian standard deviation; Stronger smoothing
+            byte thresholdValue = 150; // Sharpening threshold; higher = fewer contrasts get sharpened
+            float sharpenValue = 2; // Sharpening intensity; Stronger edges, but more noise
+
+            // TODO : Figure out what kernel size and sigma works best.
+            // Reduce noise in the image.
+            output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+
+            // TODO : Maybe run the image through edge sharpening?
+            byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            output = Sharpen(output, mask, thresholdValue, sharpenValue);
+
+            // TODO : Determine for what percentages it works best.
+            // Adjust the contrast such that the object is easier to pick out.
+            output = AutoAdjustContrast(output);
+
+            // Run the image through Edge detection
+            output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
+
             return output;
         }// objectDetectionPipeline.
 
@@ -1059,12 +1080,22 @@ namespace ImageApp
             for (int x = 0; x < inputImage.GetLength(0); x++)
             for (int y = 0; y < inputImage.GetLength(1); y++)
             {
-                tempImage[x, y] = (byte)Math.Sqrt(Math.Pow(tempImageH[x, y], 2) + Math.Pow(tempImageV[x, y], 2));
+                double magnitude = Math.Sqrt(
+                    Math.Pow(tempImageH[x, y], 2) +
+                    Math.Pow(tempImageV[x, y], 2)
+                );
+
+                tempImage[x, y] = (byte)Math.Clamp(
+                    magnitude,
+                    0,
+                    255
+                );            
             }
 
             return tempImage;
 
         }
+
         /// <summary>
         /// Thresholds a grayscale image into a binary representation based on a cutoff value.
         /// </summary>
