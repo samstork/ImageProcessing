@@ -629,8 +629,7 @@ namespace ImageApp
                                         for (int x = 0; x < w; x++)
                                         for (int y = 0; y < h; y++)
                                         {
-                                            byte v = nms[x, y];
-                                            if (v == 0 || v < thresholdSValue) continue;
+                                            if (nms[x, y] == 0 || nms[x, y] < thresholdSValue) continue;
                                             peakAccumulators[i][x, y] = byte.MaxValue;
                                         }
                                     }
