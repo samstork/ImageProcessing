@@ -701,21 +701,21 @@ namespace ImageApp
 
             // TODO : Figure out what kernel size and sigma works best.
             // Reduce noise in the image.
-            // output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
 
             // TODO : Maybe run the image through edge sharpening?
-            // byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
-            // output = Sharpen(gray, mask, thresholdValue, sharpenValue);
+            byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            output = Sharpen(gray, mask, thresholdValue, sharpenValue);
 
             // TODO : Determine for what percentages it works best.
             // Adjust the contrast such that the object is easier to pick out.
-            // output = AutoAdjustContrast(output, 5, 95);
+            output = AutoAdjustContrast(gray, 5, 95);
 
             // Run the image through Edge detection
-            // output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
+            output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
 
             // Canny edge detection
-            output = cannyEdgeDetection(gray, _horizontalKernel, _verticalKernel, 50, 150);
+            // output = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 150);
 
             // -----------------------------------------------------------------
             // Recognizing the object.
