@@ -173,8 +173,9 @@ namespace ImageApp
 			int h = circleAccumulators[0].GetLength(1);
 			for (int i = 0; i < circleAccumulators.Length; i++)
 			{
-				double maxCircleValue = CircleSteps(i + minRadius) * (binary ? 1 : byte.MaxValue);
-
+				int steps = CircleSteps(i + minRadius);
+				double maxCircleValue = steps * Math.Pow(steps / (double)CircleSteps(minRadius * 2), 0.5)
+                    	* (binary ? 1 : byte.MaxValue);
 				normedAccumulators[i] = new byte[w, h];
 				for (int x = 0; x < w; x++)
 				for (int y = 0; y < h; y++)

@@ -622,8 +622,8 @@ namespace ImageApp
                                 case ProcessingFunctions.HoughCircleTransform:
                                 {
                                     bool binary = IsBinary(gray);
-                                    int minRadius = 10;
-                                    int maxRadius = 100;
+                                    int minRadius = thresholdValue;
+                                    int maxRadius = thresholdTValue;
                                     byte[][,] accumulators = HoughTransformer.HoughCircleTransform(gray, binary, minRadius, maxRadius);
                                     byte[][,] peakAccumulators = new byte[accumulators.GetLength(0)][,];
                                     for (int i = 0; i < accumulators.GetLength(0); i++)
