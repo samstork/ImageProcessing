@@ -75,7 +75,7 @@ namespace ImageApp
 			int[][,] accumulator = new int[radiusInterval + 1][,];
 
 			// Compute maximum r (diagonal length of img) and divide by the number of d bins.
-			float kAngleRad = (float)Math.PI/kNumber;
+			float kAngleRad = (float)Math.PI * 2/kNumber;
 
 			// Since we're using the same theta values each loop, we can precompute the sines and cosines and just look them up.
 			float[] sines = new float[kNumber];
@@ -88,7 +88,7 @@ namespace ImageApp
 
 			int a, b;
 			byte accumValue = 1;
-			for (int radius = 0; radius < radiusInterval; radius++)
+			for (int radius = 0; radius <= radiusInterval; radius++)
 			{
 				accumulator[radius] = new int[w,h];
 				for (int x = 0; x<w; x++)
@@ -186,9 +186,9 @@ namespace ImageApp
 
 			bool[,] plusStruct =
 			{
-				{ false, true,  false },
+				{ true, true,  true },
 				{ true,  false,  true  },
-				{ false, true,  false }  
+				{ true, true,  true }  
 			};
 			
 			bool localMax;
@@ -344,6 +344,47 @@ namespace ImageApp
 			}
 
 			return output;
+		}
+
+		public static byte[,,] VisualiseCircles(byte[,] edgeImage, byte[][,] peakAccumulators, int minRadius)
+		{
+		int w = edgeImage.GetLength(0);
+		int h = edgeImage.GetLength(1);
+		byte[,,] output = new byte[w,h,3];
+		for(int x = 0; x<w; x++)
+		for(int y = 0; y<h; y++)
+		{
+			output[x,y,0] = edgeImage[x,y];
+			output[x,y,1] = edgeImage[x,y];
+			output[x,y,2] = edgeImage[x,y];
+		}
+
+		for(int r = 0; r < peakAccumulators.Length; r++)
+		{
+			byte[,] peaks = peakAccumulators[r];
+			if(peaks == null) continue;
+			int radius = r + minRadius;
+			// Step of ~1 pixel along the circumference.
+			int steps = Math.Max(8, (int)Math.Ceiling(2 * Math.PI * radius));
+
+			for(int cx = 0; cx<w; cx++)
+			for(int cy = 0; cy<h; cy++)
+			{
+			if(peaks[cx,cy] == 0) continue;
+			for(int s = 0; s < steps; s++)
+			{
+				double angle = 2 * Math.PI * s / steps;
+				int x = cx + (int)Math.Round(Math.Cos(angle) * radius);
+				int y = cy + (int)Math.Round(Math.Sin(angle) * radius);
+				if(x < 0 || x >= w || y < 0 || y >= h) continue;
+				output[x,y,0] = byte.MaxValue;
+				output[x,y,1] = 0;
+				output[x,y,2] = 0;
+			}
+			}
+		}
+
+		return output;
 		}
 	} 
 }

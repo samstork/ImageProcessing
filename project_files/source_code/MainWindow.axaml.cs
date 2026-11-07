@@ -612,10 +612,24 @@ namespace ImageApp
                                 case ProcessingFunctions.HoughCircleTransform:
                                 {
                                     bool binary = IsBinary(gray);
-                                    int minRadius = 2;
-                                    int maxRadius = 20;
-                                    int[][,] accumulator = HoughTransformer.HoughCircleTransform(gray, binary, kValue, dValue, minRadius, maxRadius);
-                                    result = IntToByte(accumulator[4]);
+                                    int minRadius = 3;
+                                    int maxRadius = 100;
+                                    int[][,] accumulators = HoughTransformer.HoughCircleTransform(gray, binary, kValue, dValue, minRadius, maxRadius);
+                                    byte[][,] peakAccumulators = new byte[accumulators.GetLength(0)][,];
+                                    double fullCircle = 0;
+                                    for (int i = 0; i < accumulators.GetLength(0); i++)
+                                    {
+                                        fullCircle = 2 * Math.PI * (i + minRadius) * (binary ? 1 : byte.MaxValue);
+                                        peakAccumulators[i] = new byte[accumulators[i].GetLength(0), accumulators[i].GetLength(1)];
+
+                                        for (int x = 0; x < accumulators[i].GetLength(0); x++)
+                                        for (int y = 0; y < accumulators[i].GetLength(1); y++)
+                                        {
+                                            peakAccumulators[i][x, y] = (byte)Math.Min(byte.MaxValue, accumulators[i][x, y] * byte.MaxValue / fullCircle);
+                                        }
+                                        peakAccumulators[i] = HoughTransformer.HoughPeaks(peakAccumulators[i], thresholdValue);
+                                    }
+                                    result = HoughTransformer.VisualiseCircles(gray, peakAccumulators, minRadius);
                                     break;
 
                                 }
@@ -764,14 +778,14 @@ namespace ImageApp
             }
             return tempImage;
         }
-        private byte[,] IntToByte(int[,] inputImage)
+        private byte[,] IntToByte(int[,] inputImage, int globalMax = 0, int globalMin = int.MaxValue)
         {
             // create temporary grayscale image
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
 
             int w = tempImage.GetLength(0);
             int h = tempImage.GetLength(1);
-            int maxValue = 0;
+            int maxValue = globalMax;
             int minValue = int.MaxValue;
             for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
