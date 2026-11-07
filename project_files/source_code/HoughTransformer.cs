@@ -215,18 +215,18 @@ namespace ImageApp
                     int y_offset = j+v-1;
 					
 					// Wrap x around like pacman
-					if (!wrap)
+					if (wrap)
 					{
-						// Spatial accumulator: no wrapping, out-of-bounds neighbours are ignored below.
-					} else if (x_offset < 0)
-					{
-						x_offset += w;
-						y_offset = h - y_offset;
-					} else if (x_offset >= w)
-					{
-						x_offset -= w;
-						y_offset = h - y_offset;
-					} 
+						if (x_offset < 0)
+						{
+							x_offset += w;
+							y_offset = h - y_offset;
+						} else if (x_offset >= w)
+						{
+							x_offset -= w;
+							y_offset = h - y_offset;
+						} 
+					}
 
                     // Check if the offset element is within the bounds of the image.
                     if ((x_offset>=0) && (x_offset<w) && (y_offset>=0) && (y_offset<h))
