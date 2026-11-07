@@ -691,29 +691,180 @@ namespace ImageApp
             int h = gray.GetLength(1);
             byte[,] output = new byte[w,h];
 
+            // -----------------------------------------------------------------
+            // Pre-processing.
             // Parameters for the functions
             byte kernelSize = 5; // Guassian blur size; higher = more smoothing, less noise
-            float sigmaValue = 1; // Guassian standard deviation; Stronger smoothing
-            byte thresholdValue = 150; // Sharpening threshold; higher = fewer contrasts get sharpened
-            float sharpenValue = 2; // Sharpening intensity; Stronger edges, but more noise
+            float sigmaValue = 0.5f; // Guassian standard deviation; Stronger smoothing
+            byte thresholdValue = 100; // Sharpening threshold; higher = fewer contrasts get sharpened
+            float sharpenValue = 0.5f; // Sharpening intensity; Stronger edges, but more noise
 
             // TODO : Figure out what kernel size and sigma works best.
             // Reduce noise in the image.
-            output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            // output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
 
             // TODO : Maybe run the image through edge sharpening?
-            byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
-            output = Sharpen(output, mask, thresholdValue, sharpenValue);
+            // byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            // output = Sharpen(gray, mask, thresholdValue, sharpenValue);
 
             // TODO : Determine for what percentages it works best.
             // Adjust the contrast such that the object is easier to pick out.
-            output = AutoAdjustContrast(output);
+            // output = AutoAdjustContrast(output, 5, 95);
 
             // Run the image through Edge detection
-            output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
+            // output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
+
+            // Canny edge detection
+            output = cannyEdgeDetection(gray, _horizontalKernel, _verticalKernel, 50, 150);
+
+            // -----------------------------------------------------------------
+            // Recognizing the object.
 
             return output;
         }// objectDetectionPipeline.
+
+        private static byte[,] cannyEdgeDetection (byte[,] inputImage,
+                                            float[,] horizontalKernel,
+                                            float[,] verticalKernel,
+                                            byte lower_threshold = 50,
+                                            byte upper_threshold = 250)
+        {
+            // create temporary grayscale image
+            int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+            byte[,] tempImage = new byte[w,h];
+
+            // Apply Gaussian filter to smooth the image in order to remove the noise - Already done in preprocessing.
+            short[,] tempImageH = SConvolveImage(inputImage, horizontalKernel);
+            short[,] tempImageV = SConvolveImage(inputImage, verticalKernel);
+
+            double[,] magnitude = new double[w,h];
+            double[,] direction = new double[w,h]; 
+
+            // Find the intensity gradients of the image
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                double gx = tempImageH[x,y];
+                double gy = tempImageV[x,y];
+
+                magnitude[x,y] = Math.Sqrt(
+                    Math.Pow(gx, 2) +
+                    Math.Pow(gy, 2)
+                );
+
+                // Compute the angle using the vector produced by gx and gy 
+                direction[x,y] = Math.Atan2(gy,gx);
+            }
+
+            // Apply non-maximum suppression, this is used to remove multiple overlapping
+            // bounding boxes that represent the same object.
+            double[,] suppressed = NonMaximumSuppression(magnitude, direction);
+
+            // TODO: Find good thresholding values.
+            // Now apply double thresholding.
+            byte weak_threshold = 75;
+            byte strong_threshold = 255;
+
+            byte[,] thresholded = new byte[w,h];
+
+            for (int x = 0; x<w; x++)
+            for (int y = 0; y<h; y++)
+            {
+                if (suppressed[x,y]>=upper_threshold){
+                    thresholded[x,y] = strong_threshold;
+                }
+                else if (suppressed[x,y] >= lower_threshold){
+                    thresholded[x,y] = weak_threshold;
+                }
+            }
+
+            // Finally we use edge tracking by hysteresis
+            byte[,] output = new byte[w, h];
+
+            Queue<(int x, int y)> queue = new();
+
+            // Find all strong edges
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                if (thresholded[x, y] == strong_threshold)
+                {
+                    output[x, y] = strong_threshold;
+                    queue.Enqueue((x, y));
+                }
+            }
+
+            // Eight-connected neighborhood
+            int[] dx = { -1, -1, -1, 0, 0, 1, 1, 1 };
+            int[] dy = { -1, 0, 1, -1, 1, -1, 0, 1 };
+
+            while (queue.Count > 0)
+            {
+                var (x, y) = queue.Dequeue();
+
+                for (int i = 0; i < 8; i++)
+                {
+                    int nx = x + dx[i];
+                    int ny = y + dy[i];
+
+                    if (nx < 0 || nx >= w ||
+                        ny < 0 || ny >= h)
+                        continue;
+
+                    if (thresholded[nx, ny] == weak_threshold &&
+                        output[nx, ny] == 0)
+                    {
+                        output[nx, ny] = strong_threshold;
+                        queue.Enqueue((nx, ny));
+                    }
+                }
+            }
+
+            return output;
+        }
+
+        private static double[,] NonMaximumSuppression(double[,] magnitude, 
+                                                     double[,] direction)
+        {
+            int w = magnitude.GetLength(0);
+            int h = magnitude.GetLength(1);
+            double[,] output = new double[w,h];
+
+            for (int x = 1; x < (w-1); x++)
+            for (int y = 1; y < (h-1); y++)
+            {
+                double angle = direction[x,y]*180.0/Math.PI;
+                if (angle<0) angle += 180.0;
+                double first;
+                double second;
+
+                if (angle < 22.5 || angle >= 157.5){
+                    first = magnitude[x - 1, y];
+                    second = magnitude[x + 1, y];
+                }
+                else if (angle < 67.5){
+                    first = magnitude[x - 1, y - 1];
+                    second = magnitude[x + 1, y + 1];
+                }
+                else if (angle < 112.5){
+                    first = magnitude[x, y - 1];
+                    second = magnitude[x, y + 1];
+                }
+                else{
+                    first = magnitude[x - 1, y + 1];
+                    second = magnitude[x + 1, y - 1];
+                }
+
+                if (magnitude[x, y] >= first &&
+                    magnitude[x, y] >= second)
+                {
+                    output[x, y] = magnitude[x, y];
+                }
+            }
+
+            return output;
+        }
 
         private static bool IsBinary(byte[,] gray)
         {
