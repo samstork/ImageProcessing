@@ -702,6 +702,7 @@ namespace ImageApp
             // TODO : Figure out what kernel size and sigma works best.
             // Reduce noise in the image.
             output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            // output = MedianFilter(gray, kernelSize);
 
             // TODO : Maybe run the image through edge sharpening?
             byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
