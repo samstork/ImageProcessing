@@ -616,23 +616,25 @@ namespace ImageApp
                                 case ProcessingFunctions.HoughCircleTransform:
                                 {
                                     bool binary = IsBinary(gray);
-                                    int minRadius = 3;
-                                    int maxRadius = 100;
-                                    int[][,] accumulators = HoughTransformer.HoughCircleTransform(gray, binary, kValue, dValue, minRadius, maxRadius);
+                                    int minRadius = 5;
+                                    int maxRadius = 200;
+                                    byte[][,] accumulators = HoughTransformer.HoughCircleTransform(gray, binary, minRadius, maxRadius);
                                     byte[][,] peakAccumulators = new byte[accumulators.GetLength(0)][,];
-                                    double fullCircle = 0;
                                     for (int i = 0; i < accumulators.GetLength(0); i++)
                                     {
-                                        fullCircle = 2 * Math.PI * (i + minRadius) * (binary ? 1 : byte.MaxValue);
-                                        peakAccumulators[i] = new byte[accumulators[i].GetLength(0), accumulators[i].GetLength(1)];
-
-                                        for (int x = 0; x < accumulators[i].GetLength(0); x++)
-                                        for (int y = 0; y < accumulators[i].GetLength(1); y++)
+                                        byte[,] nms = HoughTransformer.NonMaxSuppression(accumulators[i], wrap: false);
+                                        int w = nms.GetLength(0);
+                                        int h = nms.GetLength(1);
+                                        peakAccumulators[i] = new byte[w, h];
+                                        for (int x = 0; x < w; x++)
+                                        for (int y = 0; y < h; y++)
                                         {
-                                            peakAccumulators[i][x, y] = (byte)Math.Min(byte.MaxValue, accumulators[i][x, y] * byte.MaxValue / fullCircle);
+                                            byte v = nms[x, y];
+                                            if (v == 0 || v < thresholdSValue) continue;
+                                            peakAccumulators[i][x, y] = byte.MaxValue;
                                         }
-                                        peakAccumulators[i] = HoughTransformer.HoughPeaks(peakAccumulators[i], thresholdValue);
                                     }
+
                                     result = HoughTransformer.VisualiseCircles(gray, peakAccumulators, minRadius);
                                     break;
 
@@ -1051,7 +1053,7 @@ namespace ImageApp
 
             int w = tempImage.GetLength(0);
             int h = tempImage.GetLength(1);
-            int maxValue = globalMax;
+            int maxValue = 0;
             int minValue = int.MaxValue;
             for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
