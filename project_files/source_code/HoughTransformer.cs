@@ -67,60 +67,49 @@ namespace ImageApp
 			return accumulator;
 		}
 
-		public static int[][,] HoughCircleTransform(byte[,] inputImage, bool binary, int kNumber, int dNumber, int minRadius, int maxRadius) {
+		public static byte[][,] HoughCircleTransform(byte[,] inputImage, bool binary, int minRadius, int maxRadius) {
 			int w = inputImage.GetLength(0);
 			int h = inputImage.GetLength(1);
 			int radiusInterval = maxRadius - minRadius;
 
 			int[][,] accumulator = new int[radiusInterval + 1][,];
 
-			// Compute maximum r (diagonal length of img) and divide by the number of d bins.
-			float kAngleRad = (float)Math.PI * 2/kNumber;
-
-			// Since we're using the same theta values each loop, we can precompute the sines and cosines and just look them up.
-			float[] sines = new float[kNumber];
-			float[] cosines = new float[kNumber];
-			for (int i = 0; i < kNumber; i++)
+			int a, b, radius, k, vote;
+			for (int i = 0; i <= radiusInterval; i++)
 			{
-				sines[i] = (float)Math.Sin(kAngleRad * i);
-				cosines[i] = (float)Math.Cos(kAngleRad * i);
-			}
 
-			int a, b;
-			byte accumValue = 1;
-			for (int radius = 0; radius <= radiusInterval; radius++)
-			{
-				accumulator[radius] = new int[w,h];
+				accumulator[i] = new int[w,h];
+				radius = i + minRadius;
+				k = CircleSteps(radius);
+    			(int x, int y)[] offsets = new (int x, int y)[k];
+				    for (int s = 0; s < k; s++)
+				{
+					double angle = 2 * Math.PI * s / k;
+					offsets[s] = ((int)Math.Round(Math.Cos(angle) * radius), (int)Math.Round(Math.Sin(angle) * radius));
+				}
 				for (int x = 0; x<w; x++)
 				for (int y = 0; y<h; y++)
 				{
 					if (inputImage[x, y] == 0) continue;
-					if(!binary) accumValue = inputImage[x, y];
-					for (int theta = 0; theta < kNumber; theta++)
+					vote = binary ? 1 : inputImage[x, y];
+					foreach ((int x, int y) offset in offsets)
 					{
-						b = y - (int)Math.Round(sines[theta] * (radius + minRadius));
-						a = x - (int)Math.Round(cosines[theta] * (radius + minRadius));
-						if (0 <= b && b < h && 0 <= a && a < w)
-						{
-							accumulator[radius][a,b] += accumValue;
-						}
-
+						a = x - offset.x;
+						b = y - offset.y;
+						if (0 <= a && a < w && 0 <= b && b < h) accumulator[i][a, b] += vote;
 					}
 
 				}
 			}
-			return accumulator;
-		}
-		// 	Pseudocode from wikipedia (Used as basis)
-		// For each A[a,b,r] = 0; // fill with zeroes initially, instantiate 3D matrix
-		//   For each cell(x,y)
-		//       For each theta t = 0 to 360  // the possible  theta 0 to 360
-		//          b = y – r * sin(t * PI / 180);  //polar coordinate for center (convert to radians)
-		//          a = x – r * cos(t * PI / 180); //polar coordinate for center (convert to radians)
-		//          A[a,b,r] +=1; //voting
-		//       end
-		//   end
 
+			return NormCircleAccumulatorByRadius(accumulator, minRadius, binary);
+		}
+
+
+		public static int CircleSteps(int radius)
+		{
+			return Math.Max(8, (int)Math.Ceiling(2 * Math.PI * radius));
+		}
 
 		public static int[,] NormaliseAccumulator(byte[,] inputImage, int[,] accumulator, bool binary)
 		{
@@ -177,7 +166,25 @@ namespace ImageApp
 			return output;
 		}
 
-		private static byte[,] NonMaxSuppression(byte[,] inputImage)
+		public static byte[][,] NormCircleAccumulatorByRadius(int[][,] circleAccumulators, int minRadius, bool binary)
+		{
+			byte[][,] normedAccumulators = new byte[circleAccumulators.Length][,];
+			int w = circleAccumulators[0].GetLength(0);
+			int h = circleAccumulators[0].GetLength(1);
+			for (int i = 0; i < circleAccumulators.Length; i++)
+			{
+				double maxCircleValue = CircleSteps(i + minRadius) * (binary ? 1 : byte.MaxValue);
+
+				normedAccumulators[i] = new byte[w, h];
+				for (int x = 0; x < w; x++)
+				for (int y = 0; y < h; y++)
+				{
+					normedAccumulators[i][x, y] = (byte)Math.Min(byte.MaxValue, circleAccumulators[i][x, y] * byte.MaxValue / maxCircleValue);
+				}
+			}
+			return normedAccumulators;
+		}
+		public static byte[,] NonMaxSuppression(byte[,] inputImage, bool wrap = true)
         {
             int w = inputImage.GetLength(0);
             int h = inputImage.GetLength(1);
@@ -187,7 +194,7 @@ namespace ImageApp
 			bool[,] plusStruct =
 			{
 				{ true, true,  true },
-				{ true,  false,  true  },
+				{ true,  false,  true },
 				{ true, true,  true }  
 			};
 			
@@ -208,7 +215,10 @@ namespace ImageApp
                     int y_offset = j+v-1;
 					
 					// Wrap x around like pacman
-					if (x_offset < 0)
+					if (!wrap)
+					{
+						// Spatial accumulator: no wrapping, out-of-bounds neighbours are ignored below.
+					} else if (x_offset < 0)
 					{
 						x_offset += w;
 						y_offset = h - y_offset;
