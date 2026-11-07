@@ -76,6 +76,7 @@ namespace ImageApp
             GrayscalePipeline,
             NormalizeAccumulator,
             HoughCircleTransform,
+            ObjectDetectionPipeline,
         }
         
         private enum FilterOptions
@@ -408,6 +409,9 @@ namespace ImageApp
 
                         switch (selected)
                             {
+                                case ProcessingFunctions.ObjectDetectionPipeline:
+                                    result = objectDetectionPipeline(gray);
+                                    break;
                                 case ProcessingFunctions.ConvertToGrayscale:
                                     // Already fully working; gray already holds the grayscale
                                     // conversion result at this point (computed above, before this switch),
@@ -694,6 +698,189 @@ namespace ImageApp
         // ==================== FUNCTIONS TO IMPLEMENT =======================
         // ====================================================================
 
+        // TODO : Figure out best parameters for the preprocessing.
+        private byte[,] objectDetectionPipeline (byte[,] gray)
+        {
+            int w = gray.GetLength(0);
+            int h = gray.GetLength(1);
+            byte[,] output = new byte[w,h];
+
+            // -----------------------------------------------------------------
+            // Pre-processing.
+            // Parameters for the functions
+            byte kernelSize = 5; // Guassian blur size; higher = more smoothing, less noise
+            float sigmaValue = 0.5f; // Guassian standard deviation; Stronger smoothing
+            byte thresholdValue = 100; // Sharpening threshold; higher = fewer contrasts get sharpened
+            float sharpenValue = 0.5f; // Sharpening intensity; Stronger edges, but more noise
+
+            // TODO : Figure out what kernel size and sigma works best.
+            // Reduce noise in the image.
+            output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            // output = MedianFilter(gray, kernelSize);
+
+            // TODO : Maybe run the image through edge sharpening?
+            byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            output = Sharpen(gray, mask, thresholdValue, sharpenValue);
+
+            // TODO : Determine for what percentages it works best.
+            // Adjust the contrast such that the object is easier to pick out.
+            output = AutoAdjustContrast(gray, 5, 95);
+
+            // Run the image through Edge detection
+            output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
+
+            // Canny edge detection
+            // output = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 150);
+
+            // -----------------------------------------------------------------
+            // Recognizing the object.
+
+            return output;
+        }// objectDetectionPipeline.
+
+        private static byte[,] cannyEdgeDetection (byte[,] inputImage,
+                                            float[,] horizontalKernel,
+                                            float[,] verticalKernel,
+                                            byte lower_threshold = 50,
+                                            byte upper_threshold = 250)
+        {
+            // create temporary grayscale image
+            int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+            byte[,] tempImage = new byte[w,h];
+
+            // Apply Gaussian filter to smooth the image in order to remove the noise - Already done in preprocessing.
+            short[,] tempImageH = SConvolveImage(inputImage, horizontalKernel);
+            short[,] tempImageV = SConvolveImage(inputImage, verticalKernel);
+
+            double[,] magnitude = new double[w,h];
+            double[,] direction = new double[w,h]; 
+
+            // Find the intensity gradients of the image
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                double gx = tempImageH[x,y];
+                double gy = tempImageV[x,y];
+
+                magnitude[x,y] = Math.Sqrt(
+                    Math.Pow(gx, 2) +
+                    Math.Pow(gy, 2)
+                );
+
+                // Compute the angle using the vector produced by gx and gy 
+                direction[x,y] = Math.Atan2(gy,gx);
+            }
+
+            // Apply non-maximum suppression, this is used to remove multiple overlapping
+            // bounding boxes that represent the same object.
+            double[,] suppressed = NonMaximumSuppression(magnitude, direction);
+
+            // TODO: Find good thresholding values.
+            // Now apply double thresholding.
+            byte weak_threshold = 75;
+            byte strong_threshold = 255;
+
+            byte[,] thresholded = new byte[w,h];
+
+            for (int x = 0; x<w; x++)
+            for (int y = 0; y<h; y++)
+            {
+                if (suppressed[x,y]>=upper_threshold){
+                    thresholded[x,y] = strong_threshold;
+                }
+                else if (suppressed[x,y] >= lower_threshold){
+                    thresholded[x,y] = weak_threshold;
+                }
+            }
+
+            // Finally we use edge tracking by hysteresis
+            byte[,] output = new byte[w, h];
+
+            Queue<(int x, int y)> queue = new();
+
+            // Find all strong edges
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                if (thresholded[x, y] == strong_threshold)
+                {
+                    output[x, y] = strong_threshold;
+                    queue.Enqueue((x, y));
+                }
+            }
+
+            // Eight-connected neighborhood
+            int[] dx = { -1, -1, -1, 0, 0, 1, 1, 1 };
+            int[] dy = { -1, 0, 1, -1, 1, -1, 0, 1 };
+
+            while (queue.Count > 0)
+            {
+                var (x, y) = queue.Dequeue();
+
+                for (int i = 0; i < 8; i++)
+                {
+                    int nx = x + dx[i];
+                    int ny = y + dy[i];
+
+                    if (nx < 0 || nx >= w ||
+                        ny < 0 || ny >= h)
+                        continue;
+
+                    if (thresholded[nx, ny] == weak_threshold &&
+                        output[nx, ny] == 0)
+                    {
+                        output[nx, ny] = strong_threshold;
+                        queue.Enqueue((nx, ny));
+                    }
+                }
+            }
+
+            return output;
+        }
+
+        private static double[,] NonMaximumSuppression(double[,] magnitude, 
+                                                     double[,] direction)
+        {
+            int w = magnitude.GetLength(0);
+            int h = magnitude.GetLength(1);
+            double[,] output = new double[w,h];
+
+            for (int x = 1; x < (w-1); x++)
+            for (int y = 1; y < (h-1); y++)
+            {
+                double angle = direction[x,y]*180.0/Math.PI;
+                if (angle<0) angle += 180.0;
+                double first;
+                double second;
+
+                if (angle < 22.5 || angle >= 157.5){
+                    first = magnitude[x - 1, y];
+                    second = magnitude[x + 1, y];
+                }
+                else if (angle < 67.5){
+                    first = magnitude[x - 1, y - 1];
+                    second = magnitude[x + 1, y + 1];
+                }
+                else if (angle < 112.5){
+                    first = magnitude[x, y - 1];
+                    second = magnitude[x, y + 1];
+                }
+                else{
+                    first = magnitude[x - 1, y + 1];
+                    second = magnitude[x + 1, y - 1];
+                }
+
+                if (magnitude[x, y] >= first &&
+                    magnitude[x, y] >= second)
+                {
+                    output[x, y] = magnitude[x, y];
+                }
+            }
+
+            return output;
+        }
+
         private static bool IsBinary(byte[,] gray)
         {
             int w = gray.GetLength(0);
@@ -777,8 +964,87 @@ namespace ImageApp
                 tempImage[x, y] = (byte)Math.Floor((inputImage[x, y] - minValue) * contrastCoefficient);
             }
             return tempImage;
-        }
-        private byte[,] IntToByte(int[,] inputImage, int globalMax = 0, int globalMin = int.MaxValue)
+        }// AdjustContrast
+
+        /// <summary>
+        /// Adjusts the contrast of the input grayscale image.
+        /// Values above max are mapped to 255, values below min are mapped to 0.
+        /// </summary>
+        /// <param name="inputImage">The 2D input grayscale image.</param>
+        /// <param name="min">The threshold % under which the pixels are mapped to 0.</param>
+        /// <param name="max">The threshold % above which the pixels are mapped to 255.</param>
+        /// <returns>A new 2D grayscale image with adjusted contrast.</returns>
+        private byte[,] AutoAdjustContrast(byte[,] inputImage, int min = 5, int max = 95)
+        {
+            // create temporary grayscale image
+            byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
+
+            int w = tempImage.GetLength(0);
+            int h = tempImage.GetLength(1);
+
+            // Determine the values of Alow and Ahigh
+            // First calculate the accumulative pixel value
+            int[] histogram = new int[256];
+            int total_pixels = w*h;
+            for (int i = 0; i < w; i++)
+            for (int j = 0; j < h; j++)
+            {
+                histogram[inputImage[i,j]]++;
+            }
+            int[] accumulative_histogram = new int[256];
+            accumulative_histogram[0] = histogram[0];
+            for (int i = 1; i < 256; i++)
+            {
+                accumulative_histogram[i] = accumulative_histogram[i-1]+histogram[i];
+            }
+
+            // Now calculate the lower and upper threshold.
+            int lower_threshold = (int)(total_pixels*(min/100.0));
+            int upper_threshold = (int)(total_pixels*(max/100.0));
+
+            // Calculate the values for alow and ahigh
+            int a_low = -1;
+            int a_high = -1;
+            int iterator = 0;
+            while (a_low == -1)
+            {
+                if (accumulative_histogram[iterator]>=lower_threshold) a_low = iterator;
+                iterator++;
+                if (iterator > 255)
+                {
+                    a_low = 0;
+                    break;
+                }
+            }// while
+            iterator = 0;
+            while (a_high == -1)
+            {
+                if (accumulative_histogram[iterator] > upper_threshold) a_high = iterator ;
+                iterator++;
+                if (iterator > 255)
+                {
+                    a_high = 255;
+                    break;
+                }
+            }// while
+
+            float contrastCoefficient = 1f;
+            if (a_high - a_low > 0)
+            {
+                contrastCoefficient = (float)byte.MaxValue / (a_high - a_low);
+            }
+
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                if (inputImage[x,y]>=a_high) tempImage[x,y] = 255;
+                else if (inputImage[x,y]<=a_low) tempImage[x,y] = 0;
+                else tempImage[x, y] = (byte)Math.Clamp((int)Math.Round((inputImage[x,y] - a_low) * contrastCoefficient),0, 255);
+            }
+            return tempImage;
+        }// AutoAdjustContrast
+
+        private byte[,] IntToByte(int[,] inputImage)
         {
             // create temporary grayscale image
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
@@ -980,12 +1246,22 @@ namespace ImageApp
             for (int x = 0; x < inputImage.GetLength(0); x++)
             for (int y = 0; y < inputImage.GetLength(1); y++)
             {
-                tempImage[x, y] = (byte)Math.Sqrt(Math.Pow(tempImageH[x, y], 2) + Math.Pow(tempImageV[x, y], 2));
+                double magnitude = Math.Sqrt(
+                    Math.Pow(tempImageH[x, y], 2) +
+                    Math.Pow(tempImageV[x, y], 2)
+                );
+
+                tempImage[x, y] = (byte)Math.Clamp(
+                    magnitude,
+                    0,
+                    255
+                );            
             }
 
             return tempImage;
 
         }
+
         /// <summary>
         /// Thresholds a grayscale image into a binary representation based on a cutoff value.
         /// </summary>
