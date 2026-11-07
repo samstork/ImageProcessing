@@ -77,6 +77,7 @@ namespace ImageApp
             NormalizeAccumulator,
             HoughCircleTransform,
             ObjectDetectionPipeline,
+            CannyEdgeDetection,
         }
         
         private enum FilterOptions
@@ -613,6 +614,11 @@ namespace ImageApp
                                     result = AdjustContrast(IntToByte(accumulator));
                                     break;
                                 }
+                                case ProcessingFunctions.CannyEdgeDetection:
+                                {
+                                    result = cannyEdgeDetection(gray, _horizontalKernel, _verticalKernel);
+                                    break;
+                                }
                                 case ProcessingFunctions.HoughCircleTransform:
                                 {
                                     bool binary = IsBinary(gray);
@@ -1051,7 +1057,7 @@ namespace ImageApp
 
             int w = tempImage.GetLength(0);
             int h = tempImage.GetLength(1);
-            int maxValue = globalMax;
+            int maxValue = 0;
             int minValue = int.MaxValue;
             for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)

@@ -155,8 +155,8 @@ namespace ImageApp
 				}
 			}
 			return output;
-
 		}
+        
 		public static byte[,] HoughPeaks(byte[,] accumulator, int peak_threshold)
 		{
 			int w = accumulator.GetLength(0);
