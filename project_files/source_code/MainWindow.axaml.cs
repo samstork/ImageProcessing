@@ -95,6 +95,7 @@ namespace ImageApp
             ObjectDetectionPipeline,
             CannyEdgeDetection,
             Downsample,
+            GammaCorrection,
         }
         
         private enum FilterOptions
@@ -124,7 +125,7 @@ namespace ImageApp
             dBox.Value = 360;
 
             ThresholdSBox.Value = 150;
-            ThresholdTBox.Value = 150;
+            ThresholdTBox.Value = 160;
 
             KernelBox.Value = 5;
             SharpenBox.Value = 1; 
@@ -530,6 +531,11 @@ namespace ImageApp
                                     result = BinaryCloseImage(gray, structElem);
                                     break;
                                 }
+                                case ProcessingFunctions.GammaCorrection:
+                                {
+                                    result = GammaCorrection(gray, sigmaValue);
+                                    break;
+                                }
                                 case ProcessingFunctions.HistogramCheck:
                                 {  
                                     newStatusText = HistogramCheck(gray);
@@ -761,39 +767,44 @@ namespace ImageApp
             float sigmaValue = 0.5f; // Guassian standard deviation; Stronger smoothing
             byte thresholdValue = 100; // Sharpening threshold; higher = fewer contrasts get sharpened
             float sharpenValue = 0.5f; // Sharpening intensity; Stronger edges, but more noise
+            float gamma = 2.0f;
+
 
             // TODO : Figure out what kernel size and sigma works best.
             // Reduce noise in the image.
-            output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
-            // output = MedianFilter(gray, kernelSize);
+            // output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            output = MedianFilter(gray, kernelSize);
+            
+            // Make the whole image somewhat darker to make bright colours pop
+            output = GammaCorrection(output, gamma);
 
             // TODO : Maybe run the image through edge sharpening?
-            byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
-            output = Sharpen(output, mask, thresholdValue, sharpenValue);
+            // byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
+            // output = Sharpen(output, mask, thresholdValue, sharpenValue);
 
             // TODO : Determine for what percentages it works best.
             // Adjust the contrast such that the object is easier to pick out.
-            output = AutoAdjustContrast(output, 5, 95);
+            // output = AutoAdjustContrast(output, 5, 95);
 
             // Run the image through Edge detection
             // output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
 
             // Canny edge detection
-            output = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 150);
+            output = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 80, 120);
 
             // -----------------------------------------------------------------
             // Recognizing the object.
 
             // Run hough circles
-            int minRadius = 10;
+            int minRadius = 5;
             int maxRadius = 200;
-            byte confidence_threshold = 80;
-            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, false, minRadius, maxRadius);
-
+            byte confidence_threshold = 140;
+            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, false, minRadius, maxRadius, 0.25f);
             // Step 1: Find pairs of circles within the circle, pairs should have
             //  A similar size.
             // Start by finding circles
             byte[][,] peakAccumulators = new byte[accumulators.GetLength(0)][,];
+            
             for (int i = 0; i < accumulators.GetLength(0); i++)
             {
                 byte[,] nms = HoughTransformer.NonMaxSuppression(accumulators[i], wrap: false);
@@ -826,7 +837,7 @@ namespace ImageApp
 
             // Iterate over all circles and try to form pairs of potential plug holes.
             // HEURISTIC determining the similarity of the holes
-            const float HEURISTIC = 0.90f; // Holes should be HEURISTIC*100 % similar
+            const float HEURISTIC = 0.80f; // Holes should be HEURISTIC*100 % similar
             List<(Circle ,Circle)> pairs = new List<(Circle,Circle)>();
             for (int i = 0; i < circles.Count; i++)
             for (int j = i+1; j < circles.Count; j++)
@@ -907,6 +918,28 @@ namespace ImageApp
             }    
             return visualized;
         }// objectDetectionPipeline.
+
+        private static byte[,] GammaCorrection(byte[,] input, double gamma)
+        {
+            int w = input.GetLength(0);
+            int h = input.GetLength(1);
+
+            byte[,] output = new byte[w, h];
+
+            for (int x = 0; x < w; x++)
+            for (int y = 0; y < h; y++)
+            {
+                double normalized = input[x, y] / 255.0;
+
+                output[x, y] = (byte)Math.Clamp(
+                    255 * Math.Pow(normalized, gamma),
+                    0,
+                    255
+                );
+            }
+
+            return output;
+        }
 
         private void visualiseCircle(byte[,,] input, Circle circle)
         {
