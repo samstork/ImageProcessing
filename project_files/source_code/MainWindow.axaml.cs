@@ -40,15 +40,15 @@ namespace ImageApp
         // GUI controls (TextBoxes, ComboBoxes, etc.) to let the user set these values.
         private static float[,] _horizontalKernel = new float[,]
         {
-            {-1f, 0, 1f},
-            {-2f, 0, 2f},
-            {-1f, 0, 1f}
-        };
-        private static float[,] _verticalKernel = new float[,]
-        {
             {-1f, -2f, -1f},
             {  0,   0,   0},
             { 1f,  2f,  1f}
+        };
+        private static float[,] _verticalKernel = new float[,]
+        {
+            {-1f, 0, 1f},
+            {-2f, 0, 2f},
+            {-1f, 0, 1f}
         };
         private static bool[,] _plusStructElem = 
         {
@@ -94,6 +94,7 @@ namespace ImageApp
             HoughCircleTransform,
             ObjectDetectionPipeline,
             CannyEdgeDetection,
+            Downsample,
         }
         
         private enum FilterOptions
@@ -438,7 +439,7 @@ namespace ImageApp
                                     result = InvertImage(gray);
                                     break;
                                 case ProcessingFunctions.AdjustContrast:
-                                    result = AdjustContrast(gray);
+                                    result = AdjustContrast(gray, sigmaValue);
                                     break;
                                 case ProcessingFunctions.ConvolveImage:
                                     result = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
@@ -632,7 +633,7 @@ namespace ImageApp
                                 }
                                 case ProcessingFunctions.CannyEdgeDetection:
                                 {
-                                    result = cannyEdgeDetection(gray, _horizontalKernel, _verticalKernel);
+                                    result = cannyEdgeDetection(gray, _horizontalKernel, _verticalKernel, thresholdValue, thresholdSValue);
                                     break;
                                 }
                                 case ProcessingFunctions.HoughCircleTransform:
@@ -661,6 +662,11 @@ namespace ImageApp
                                     result = HoughTransformer.VisualiseCircles(gray, peakAccumulators, minRadius);
                                     break;
 
+                                }
+                                case ProcessingFunctions.Downsample:
+                                {
+                                    result = Downsample(gray, 800);
+                                    break;
                                 }
                                 default:
                                     throw new NotSupportedException($"Operation '{selected}' is not implemented in the OnApply switch.");
@@ -1008,11 +1014,12 @@ namespace ImageApp
         /// </summary>
         /// <param name="inputImage">The 2D input grayscale image.</param>
         /// <returns>A new 2D grayscale image with adjusted contrast.</returns>
-        private byte[,] AdjustContrast(byte[,] inputImage)
+        private byte[,] AdjustContrast(byte[,] inputImage, float cutPercent = 0)
         {
             // create temporary grayscale image
             byte[,] tempImage = new byte[inputImage.GetLength(0), inputImage.GetLength(1)];
-
+            byte cutPercentInt = 0;
+            if (cutPercent > 0 && cutPercent < 0.5f) cutPercentInt = (byte)(cutPercent * byte.MaxValue);
             int w = tempImage.GetLength(0);
             int h = tempImage.GetLength(1);
             byte maxValue = 0;
@@ -1020,20 +1027,20 @@ namespace ImageApp
             for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
             {
-                maxValue = inputImage[x, y] > maxValue ? inputImage[x, y] : maxValue;
-                minValue = inputImage[x, y] < minValue ? inputImage[x, y] : minValue;
+                maxValue = inputImage[x, y] > maxValue && inputImage[x, y] <= byte.MaxValue - cutPercentInt ? inputImage[x, y] : maxValue;
+                minValue = inputImage[x, y] < minValue && inputImage[x, y] >= cutPercentInt ? inputImage[x, y] : minValue;
             }
             float contrastCoefficient = 1f;
             if (maxValue - minValue > 0)
             {
-                contrastCoefficient = (float)byte.MaxValue / (maxValue - minValue);
+                contrastCoefficient = byte.MaxValue / (maxValue - minValue);
 
             }
 
             for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
             {
-                tempImage[x, y] = (byte)Math.Floor((inputImage[x, y] - minValue) * contrastCoefficient);
+                tempImage[x, y] = (byte)Math.Clamp(Math.Floor((inputImage[x, y] - minValue) * contrastCoefficient), 0, byte.MaxValue);
             }
             return tempImage;
         }// AdjustContrast
@@ -1827,6 +1834,28 @@ namespace ImageApp
                 floodFillRecursive(inputImage, output, row, column, colour);
             }
         }// floodFillRecursive
+
+        private byte[,] Downsample(byte[,] inputImage, int targetResolution = 800)
+        {
+            int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+            if (w <= targetResolution && h <= targetResolution) return inputImage;
+
+            int downsampledW = w/2;
+            int downsampledH = h/2;
+            byte[,] downsampledImage = new byte[downsampledW, downsampledH];
+            for(int x = 0; x < downsampledW; x ++)
+            for(int y = 0; y < downsampledH; y++)
+            {
+                int u = 2 * x;
+                int v = 2 * y;
+                downsampledImage[x, y] = (byte)Math.Round((double)(inputImage[u, v] + 
+                                                                    inputImage[u + 1, v] + 
+                                                                    inputImage[u, v + 1] + 
+                                                                    inputImage[u + 1, v + 1])/4);
+            }
+            return Downsample(downsampledImage, targetResolution);
+        }
 
         // ====================================================================
         // ==================== IMAGE <-> BITMAP HELPERS (given) =============
