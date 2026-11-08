@@ -824,7 +824,8 @@ namespace ImageApp
                 float circle_ratio = (float)Math.Min(c1.r, c2.r) / Math.Max(c1.r, c2.r);
                 if (circle_ratio < HEURISTIC) continue;
                 // The circles should at be about 6*average(c1.r+c2.r) apart.
-                double d = Math.Sqrt(Math.Pow((c1.x-c2.x), 2)+Math.Pow((c1.y-c2.y),2))-(c1.r+c2.r);
+                // double d = Math.Sqrt(Math.Pow((c1.x-c2.x), 2)+Math.Pow((c1.y-c2.y),2))-(c1.r+c2.r);
+                double d = circleDistance(c1.x,c2.x,c1.y,c2.y,c1.r,c2.r);
                 float average_r = (c1.r+c2.r)/2;
                 float expected_d = 6*average_r;
                 if (d < (HEURISTIC*expected_d)) continue;
@@ -837,6 +838,36 @@ namespace ImageApp
             //  some distance (approximately 3*r of plughole) apart from the outer parameter. 
             // The big circle should be around a specific ratio larger. 
             // The small holes also should be on opposite sides of the big circle.
+            // possible_outlets holds all possible tuples of outlets in the following order;
+            //  Item1=outlet ; Item2=prong_hole_1 ; Item3=prong_hole_2.
+            List<(Circle,Circle,Circle)> possible_outlets = new List<(Circle,Circle,Circle)>();
+            for (int i = 0; i < pairs.Count; i++)
+            {
+                Circle c1 = pairs[i].Item1;
+                Circle c2 = pairs[i].Item2;
+                for (int j = 0; j < circles.Count; j++)
+                {
+                    Circle outlet = circles[j];
+                    // The radius of the outlet circle should be about 8 times the
+                    //  radius of the prong holes.
+                    float average_r = (c1.r+c2.r)/2;
+                    float expected_r_outlet = average_r*8.0f;
+                    if (expected_r_outlet<outlet.r*HEURISTIC) continue;
+                    if (expected_r_outlet>outlet.r*(2-HEURISTIC)) continue;
+
+                    // Distance from the outlet to the holes should be negative and
+                    //  be approximately 3*radius_of_prong_hole.
+                    double d1 = circleDistance(c1.x,outlet.x,c1.y,outlet.y,c1.r,outlet.r);
+                    double d2 = circleDistance(outlet.x,c2.x,outlet.y,c2.y,outlet.r,c2.r);
+                    if ((d1>=0)||(d2>=0)) continue;
+                    float expected_d = 3.0f*average_r;
+                    if (Math.Abs(d1) < (HEURISTIC*expected_d)) continue;
+                    if (Math.Abs(d1) > ((2f-HEURISTIC)*expected_d)) continue;
+                    if (Math.Abs(d2) < (HEURISTIC*expected_d)) continue;
+                    if (Math.Abs(d2) > ((2f-HEURISTIC)*expected_d)) continue;
+                    possible_outlets.Add((outlet,c1,c2));
+                }
+            }
 
             // Step 3: Rank the pairs (triplets?) by confidence and give a definitive
             //  answer.
@@ -845,6 +876,12 @@ namespace ImageApp
 
             return output;
         }// objectDetectionPipeline.
+
+        // Returns the distance between 2 circles. Return vlaue can be negative.
+        private double circleDistance(int x1, int x2, int y1, int y2, int r1, int r2)
+        {
+            return Math.Sqrt(Math.Pow((x1-x2), 2)+Math.Pow((y1-y2),2))-(r1+r2);
+        }
 
         private static byte[,] cannyEdgeDetection (byte[,] inputImage,
                                             float[,] horizontalKernel,
