@@ -764,27 +764,27 @@ namespace ImageApp
             byte thresholdValue = 100; // Sharpening threshold; higher = fewer contrasts get sharpened
             float sharpenValue = 0.5f; // Sharpening intensity; Stronger edges, but more noise
             int targetResolution = 800; // Maximum resolution in either axis. 
-            double gamma = 2.0;
+            double gamma = 1.1;
 
             gray = Downsample(gray, targetResolution);
 
             int w = gray.GetLength(0);
             int h = gray.GetLength(1);
-            byte[,] output = new byte[w,h];
+            // byte[,] output = new byte[w,h];
 
 
 
             // TODO : Figure out what kernel size and sigma works best.
             // Reduce noise in the image.
             // output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
-            output = MedianFilter(gray, kernelSize);
+            // output = MedianFilter(gray, kernelSize);
             
             // Make the whole image somewhat darker to make bright colours pop
-            output = GammaCorrection(output, gamma);
+            byte[,] output = GammaCorrection(gray, gamma);
 
             // TODO : Maybe run the image through edge sharpening?
-            // byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
-            // output = Sharpen(output, mask, thresholdValue, sharpenValue);
+            // byte[,] mask =  ConvolveImage(output_gamma, CreateGaussianFilter(kernelSize, sigmaValue));
+            // output = Sharpen(output_gamma, mask, thresholdValue, sharpenValue);
 
             // TODO : Determine for what percentages it works best.
             // Adjust the contrast such that the object is easier to pick out.
@@ -792,20 +792,25 @@ namespace ImageApp
 
             // Run the image through Edge detection
             // output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
+            
+
 
             // Canny edge detection
-            output = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 240);
-            Debug.WriteLine("edgesDetected");
+            byte[,] outputEdge = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 230);
+            Debug.WriteLine("Edges Detected");
 
             // -----------------------------------------------------------------
             // Recognizing the object.
 
             // Run hough circles
-            int minRadius = 3;
+            const int minRadius = 4;
             int maxRadius = Math.Max(h, w)/2;
-            byte confidence_threshold = 140;
+            byte confidence_threshold = 130;
+            const int MIN_HOLE_CONTRAST = 25;
+
+
             Debug.WriteLine("Running Hough transformer");
-            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, true, minRadius, maxRadius, 0.2f);
+            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(outputEdge, true, minRadius, maxRadius, 0.15f);
 
             // Step 1: Find pairs of circles within the circle, pairs should have
             //  A similar size.
@@ -839,6 +844,9 @@ namespace ImageApp
                     if (isLocalMax) peakAccumulators[i][x, y] = byte.MaxValue;
                 }
             });
+            
+
+            // return HoughTransformer.VisualiseCircles(output, peakAccumulators, minRadius);
 
             List<Circle>[] circleArr = new List<Circle>[radiusInterval];
             Parallel.For (0, radiusInterval, r =>
@@ -863,16 +871,18 @@ namespace ImageApp
             // HEURISTIC_A determining the similarity of the holes
             const float HEURISTIC_A = 0.90f; // Holes should be HEURISTIC_A*100 % similar
             const float HEURISTIC_B = 0.8f;
-            List<(Circle ,Circle)>[] pairsArr = new List<(Circle,Circle)>[radiusInterval];
+            List<(Circle,Circle,float)>[] pairsArr = new List<(Circle,Circle,float)>[radiusInterval];
             Parallel.For(0, radiusInterval, r1 =>
             {
                 List<Circle> baseCircles = circleArr[r1];
-                List<(Circle ,Circle)> pairsThisRadius = new List<(Circle,Circle)>();
+
+                List<(Circle, Circle, float confidence)> pairsThisRadius = new List<(Circle,Circle, float)>();
                 int maxR2 = Math.Min(radiusInterval - 1, (int)Math.Floor(r1 / HEURISTIC_A));
                 for (int r2 = r1; r2 <= maxR2; r2++)
                 {
                     List<Circle> partnerCircles = circleArr[r2];
                     foreach(Circle baseCircle in baseCircles){
+                        if (CheckCircleContrast(output, baseCircle, MIN_HOLE_CONTRAST)) continue;
                         foreach(Circle partnerCircle in partnerCircles)
                         {
                             double distance = Distance(baseCircle.x, partnerCircle.x, baseCircle.y, partnerCircle.y);
@@ -881,15 +891,15 @@ namespace ImageApp
                             Debug.WriteLine($"BC (r: {baseCircle.r} x: {baseCircle.x} y: {baseCircle.y}), PC (r: {partnerCircle.r} x: {partnerCircle.x} y: {partnerCircle.y}), Distance: {distance}, min: {HEURISTIC_A*expectedD}, max: {(2f-HEURISTIC_A)*expectedD}");
                             if (distance < (HEURISTIC_B*expectedD)) continue;
                             if (distance > ((2f-HEURISTIC_B)*expectedD)) continue;
-
+                            if (CheckCircleContrast(output, baseCircle, MIN_HOLE_CONTRAST)) continue;
                             if (ReferenceEquals(baseCircle, partnerCircle)) continue;
-                            pairsThisRadius.Add((baseCircle, partnerCircle));
+                            pairsThisRadius.Add((baseCircle, partnerCircle, (float)Math.Abs(distance - expectedD)/expectedD));
                         }
                     }
                 }
                 pairsArr[r1] = pairsThisRadius; 
             });
-            List<(Circle, Circle)> pairs = [.. pairsArr.SelectMany(l => l)];
+            List<(Circle, Circle, float)> pairs = [.. pairsArr.SelectMany(l => l)];
             Debug.WriteLine($"Found {pairs.Count} Circle Pairs");
             // List<Circle> circles = [.. circleArr.SelectMany(l => l)];
             // All potential pairs of circles should now have been found.
@@ -899,19 +909,20 @@ namespace ImageApp
             // The small holes also should be on opposite sides of the big circle.
             // possible_outlets holds all possible tuples of outlets in the following order;
             //  Item1=outlet ; Item2=prong_hole_1 ; Item3=prong_hole_2.
-            List<(Circle,Circle,Circle)> possibleOutlets = new List<(Circle,Circle,Circle)>();
+            List<(Circle outerCircle, Circle baseCircle, Circle partnerCircle, float confidence)> possibleOutlets = new List<(Circle,Circle,Circle,float)>();
             object x = new();
             Parallel.ForEach (pairs, pair =>
             {
 
                 Circle c1 = pair.Item1;
                 Circle c2 = pair.Item2;
+                float confidence = pair.Item3;
                 // The radius of the outlet circle should be about 8 times the
                 //  radius of the prong holes.
                 float averageR = (c1.r+c2.r)/2;
                 float expectedROutlet = averageR*8.0f;
-                int minOutletRad = (int)(expectedROutlet * HEURISTIC_A) - minRadius;
-                int maxOutletRad = Math.Min(radiusInterval, (int)(expectedROutlet / HEURISTIC_A) - minRadius);
+                int minOutletRad = (int)(expectedROutlet * HEURISTIC_B) - minRadius;
+                int maxOutletRad = Math.Min(radiusInterval, (int)(expectedROutlet / HEURISTIC_B) - minRadius);
                 Debug.WriteLine($"{minOutletRad}, {maxOutletRad}");
                 for (int i = minOutletRad; i < maxOutletRad; i ++)
                 {
@@ -919,16 +930,34 @@ namespace ImageApp
                     {
                         double distance1 = Distance(c1.x, outlet.x, c1.y, outlet.y);
                         double distance2 = Distance(c2.x, outlet.x, c2.y, outlet.y);
-                        Debug.WriteLine($"Distance 1: {outlet.r/HEURISTIC_A} < {distance1}");
-                        Debug.WriteLine($"Distance 2: {outlet.r/HEURISTIC_A} < {distance2}");
-                        if (Math.Abs(distance1) > outlet.r / HEURISTIC_A) continue;
-                        if (Math.Abs(distance2) > outlet.r / HEURISTIC_A) continue;
-                        lock (x) {possibleOutlets.Add((outlet, c1, c2));}
+                        Debug.WriteLine($"Distance 1: {outlet.r/HEURISTIC_B} < {distance1}");
+                        Debug.WriteLine($"Distance 2: {outlet.r/HEURISTIC_B} < {distance2}");
+                        if (Math.Abs(distance1) > outlet.r / HEURISTIC_B) continue;
+                        if (Math.Abs(distance2) > outlet.r / HEURISTIC_B) continue;
+                        lock (x) {possibleOutlets.Add((outlet, c1, c2, 0.5f * confidence + 0.5f * Math.Abs(outlet.r - expectedROutlet)/expectedROutlet));}
                     }
                     
                 }
             });
             Debug.WriteLine($"Found {possibleOutlets.Count} Potential outlets");
+            List<(Circle outerCircle, Circle baseCircle, Circle partnerCircle, float confidence)> sortedOutlets = [.. possibleOutlets.OrderByDescending(o => o.confidence)];
+            var outputOutlets = new List<(Circle outerCircle, Circle baseCircle, Circle partnerCircle, float confidence)>();
+            foreach (var outlet in sortedOutlets)
+            {
+                bool overlaps = false;
+                foreach (var kept in outputOutlets)
+                {
+                    double dist = Distance(outlet.outerCircle.x, kept.outerCircle.x, outlet.outerCircle.y, kept.outerCircle.y);
+                    // Circles overlap when centres are closer than the sum of their radii.
+                    if (dist < outlet.outerCircle.r + kept.outerCircle.r)
+                    {
+                        overlaps = true;
+                        break;
+                    }
+                }
+                if (!overlaps) outputOutlets.Add(outlet);
+            }
+            
             /*
             // Step 4: Visualize the answer in red.
             byte[,,] visualized = new byte[w,h,3];
@@ -950,7 +979,7 @@ namespace ImageApp
                 visualiseCircle(visualized, c1);
                 visualiseCircle(visualized, c2);
             }*/    
-            return visualizeOutletBoundingBoxes(gray, possibleOutlets);
+            return visualizeOutletBoundingBoxes(gray, outputOutlets);
             // return visualized;
         }// objectDetectionPipeline.
 
@@ -974,6 +1003,28 @@ namespace ImageApp
             }
 
             return output;
+        }
+
+        private static bool CheckCircleContrast(byte[,] inputImage, Circle circle, int minContrast = 25)
+        {
+            int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+            long innerSum = 0, outerSum = 0;
+
+            for (int i = -1; i < 1; i+=2)
+            for (int j = -1; j < 1; j+=2)
+            {
+                int innerX = circle.x + i, innerY = circle.y + j;
+                int outerX = circle.x + i * (3 + circle.r), outerY = circle.y + j * (3 + circle.r);
+
+                // Prune if too close to boarder
+                if (innerX < 0 || innerX >= w || innerY < 0 || innerY >= h) return false;
+                if (outerX < 0 || outerX >= w || outerY < 0 || outerY >= h) return false;
+                innerSum += inputImage[circle.x + i, circle.y + j]/4;
+                outerSum += inputImage[circle.x + i * (3 + circle.r), circle.y + j * (3 + circle.r)]/4;
+            }
+                return outerSum - innerSum >= minContrast;
+            
         }
 
         private void visualiseCircle(byte[,,] input, Circle circle)
@@ -1004,7 +1055,7 @@ namespace ImageApp
             return Math.Sqrt((x1-x2) * (x1-x2) + (y1-y2) * (y1-y2));
         }
 
-        private static byte[,,] visualizeOutletBoundingBoxes(byte[,] inputImage, List<(Circle, Circle, Circle)> outlets)
+        private static byte[,,] visualizeOutletBoundingBoxes(byte[,] inputImage, List<(Circle, Circle, Circle, float)> outlets)
         {
 
             int w = inputImage.GetLength(0);
@@ -1017,7 +1068,7 @@ namespace ImageApp
 				output[x,y,1] = inputImage[x,y];
 				output[x,y,2] = inputImage[x,y];
 			}
-            foreach ((Circle, Circle, Circle) outlet in outlets)
+            foreach ((Circle, Circle, Circle, float) outlet in outlets)
             {
                 int x0 = Math.Max(0, outlet.Item1.x - outlet.Item1.r);
                 int x1 = Math.Min(w - 1, outlet.Item1.x + outlet.Item1.r);

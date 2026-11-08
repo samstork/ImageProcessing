@@ -174,7 +174,7 @@ namespace ImageApp
 			for (int i = 0; i < circleAccumulators.Length; i++)
 			{
 				int steps = CircleSteps(i + minRadius);
-				double maxCircleValue = steps * Math.Pow(steps / (double)CircleSteps(minRadius * 2), -leniency)
+				double maxCircleValue = steps * Math.Pow(steps / (double)CircleSteps(minRadius * 3), -leniency)
                     	* (binary ? 1 : byte.MaxValue);
 				normedAccumulators[i] = new byte[w, h];
 				for (int x = 0; x < w; x++)
@@ -381,17 +381,17 @@ namespace ImageApp
 			for(int cx = 0; cx<w; cx++)
 			for(int cy = 0; cy<h; cy++)
 			{
-			if(peaks[cx,cy] == 0) continue;
-			for(int s = 0; s < steps; s++)
-			{
-				double angle = 2 * Math.PI * s / steps;
-				int x = cx + (int)Math.Round(Math.Cos(angle) * radius);
-				int y = cy + (int)Math.Round(Math.Sin(angle) * radius);
-				if(x < 0 || x >= w || y < 0 || y >= h) continue;
-				output[x,y,0] = byte.MaxValue;
-				output[x,y,1] = 0;
-				output[x,y,2] = 0;
-			}
+				if(peaks[cx,cy] == 0) continue;
+				for(int s = 0; s < steps; s++)
+				{
+					double angle = 2 * Math.PI * s / steps;
+					int x = cx + (int)Math.Round(Math.Cos(angle) * radius);
+					int y = cy + (int)Math.Round(Math.Sin(angle) * radius);
+					if(x < 0 || x >= w || y < 0 || y >= h) continue;
+					output[x,y,0] = byte.MaxValue;
+					output[x,y,1] = 0;
+					output[x,y,2] = 0;
+				}
 			}
 		}
 
