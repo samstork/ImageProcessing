@@ -429,7 +429,9 @@ namespace ImageApp
                         switch (selected)
                             {
                                 case ProcessingFunctions.ObjectDetectionPipeline:
-                                    result = ObjectDetectionPipeline(gray);
+                                    List<(Circle outerCircle, Circle baseCircle, Circle partnerCircle, float confidence)> detectedOutlets = ObjectDetectionPipeline(gray);
+                                    result = visualizeOutletBoundingBoxes(gray, detectedOutlets);
+                                    newStatusText = $"Found ${detectedOutlets.Count} outlets!";
                                     break;
                                 case ProcessingFunctions.ConvertToGrayscale:
                                     // Already fully working; gray already holds the grayscale
@@ -754,7 +756,7 @@ namespace ImageApp
         // Radius of prong: 0.25cm
         // Distance between outer perimeter of prongs: 1.5cm
         // Distance from perimeter prong to outlet perimeter: 0.75cm
-        private byte[,,] ObjectDetectionPipeline (byte[,] gray)
+        private List<(Circle outerCircle, Circle baseCircle, Circle partnerCircle, float confidence)> ObjectDetectionPipeline (byte[,] gray)
         {
             // -----------------------------------------------------------------
             // Pre-processing.
@@ -777,10 +779,14 @@ namespace ImageApp
             // TODO : Figure out what kernel size and sigma works best.
             // Reduce noise in the image.
             // output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
-            // output = MedianFilter(gray, kernelSize);
             
+            
+            byte[,] output = MedianFilter(gray, kernelSize);
+            output = AutoAdjustContrast(gray, 5, 95);
+
             // Make the whole image somewhat darker to make bright colours pop
-            byte[,] output = GammaCorrection(gray, gamma);
+            
+            output = GammaCorrection(output, gamma);
 
             // TODO : Maybe run the image through edge sharpening?
             // byte[,] mask =  ConvolveImage(output_gamma, CreateGaussianFilter(kernelSize, sigmaValue));
@@ -788,7 +794,6 @@ namespace ImageApp
 
             // TODO : Determine for what percentages it works best.
             // Adjust the contrast such that the object is easier to pick out.
-            // output = AutoAdjustContrast(output, 5, 95);
 
             // Run the image through Edge detection
             // output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
@@ -979,7 +984,7 @@ namespace ImageApp
                 visualiseCircle(visualized, c1);
                 visualiseCircle(visualized, c2);
             }*/    
-            return visualizeOutletBoundingBoxes(gray, outputOutlets);
+            return outputOutlets;
             // return visualized;
         }// objectDetectionPipeline.
 
