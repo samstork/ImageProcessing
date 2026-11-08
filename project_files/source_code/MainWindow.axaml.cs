@@ -18,7 +18,7 @@ namespace ImageApp
         private byte[,,]? _loadedColorRef; // [x, y, channel] with channel 0=R, 1=G, 2=B -- extracted once at load time
 
         object? _processedResult; // Processed grayscale values (nullable)
-        // private byte[,]? _processedResultRef; // Processed grayscale values (nullable)
+        private byte[,]? _processedResultRef; // Processed grayscale values (nullable)
 
         public class Circle
         {
@@ -95,7 +95,6 @@ namespace ImageApp
             ObjectDetectionPipeline,
             CannyEdgeDetection,
             Downsample,
-            GammaCorrection,
         }
         
         private enum FilterOptions
@@ -125,7 +124,7 @@ namespace ImageApp
             dBox.Value = 360;
 
             ThresholdSBox.Value = 150;
-            ThresholdTBox.Value = 160;
+            ThresholdTBox.Value = 150;
 
             KernelBox.Value = 5;
             SharpenBox.Value = 1; 
@@ -290,7 +289,7 @@ namespace ImageApp
                     }
                 }
 
-                // _processedResultRef = null;
+                _processedResultRef = null;
                 StatusText.Text = $"Loaded reference ({width} \u00d7 {height} px).";
             }
             catch (Exception ex)
@@ -763,7 +762,6 @@ namespace ImageApp
             float sigmaValue = 0.5f; // Guassian standard deviation; Stronger smoothing
             byte thresholdValue = 100; // Sharpening threshold; higher = fewer contrasts get sharpened
             float sharpenValue = 0.5f; // Sharpening intensity; Stronger edges, but more noise
-            float gamma = 2.0f;
             int targetResolution = 800; // Maximum resolution in either axis. 
 
             gray = Downsample(gray, targetResolution);
@@ -805,7 +803,7 @@ namespace ImageApp
             int maxRadius = Math.Max(h, w)/2;
             byte confidence_threshold = 140;
             Debug.WriteLine("Running Hough transformer");
-            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, false, minRadius, maxRadius);
+            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, false, minRadius, maxRadius, 0.2f);
 
             // Step 1: Find pairs of circles within the circle, pairs should have
             //  A similar size.
@@ -917,10 +915,10 @@ namespace ImageApp
                     {
                         double distance1 = Distance(c1.x, outlet.x, c1.y, outlet.y);
                         double distance2 = Distance(c2.x, outlet.x, c2.y, outlet.y);
-                        if (Math.Abs(distance1) < (i + minRadius)/HEURISTIC) continue;
-                        if (Math.Abs(distance1) > (i + minRadius) * HEURISTIC) continue;
-                        if (Math.Abs(distance2) < (i + minRadius)/HEURISTIC) continue;
-                        if (Math.Abs(distance2) > (i + minRadius) * HEURISTIC) continue;
+                        Debug.WriteLine($"Distance 1: {outlet.r/HEURISTIC} < {distance1}");
+                        Debug.WriteLine($"Distance 2: {outlet.r/HEURISTIC} < {distance2}");
+                        if (Math.Abs(distance1) < outlet.r / HEURISTIC) continue;
+                        if (Math.Abs(distance2) < outlet.r / HEURISTIC) continue;
                         lock (x) {possibleOutlets.Add((outlet, c1, c2));}
                     }
                     
