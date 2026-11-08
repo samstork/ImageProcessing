@@ -18,7 +18,7 @@ namespace ImageApp
         private byte[,,]? _loadedColorRef; // [x, y, channel] with channel 0=R, 1=G, 2=B -- extracted once at load time
 
         object? _processedResult; // Processed grayscale values (nullable)
-        private byte[,]? _processedResultRef; // Processed grayscale values (nullable)
+        // private byte[,]? _processedResultRef; // Processed grayscale values (nullable)
 
         public class Circle
         {
@@ -289,7 +289,7 @@ namespace ImageApp
                     }
                 }
 
-                _processedResultRef = null;
+                // _processedResultRef = null;
                 StatusText.Text = $"Loaded reference ({width} \u00d7 {height} px).";
             }
             catch (Exception ex)
@@ -735,7 +735,7 @@ namespace ImageApp
         // Radius of prong: 0.25cm
         // Distance between outer perimeter of prongs: 1.5cm
         // Distance from perimeter prong to outlet perimeter: 0.75cm
-        private byte[,] objectDetectionPipeline (byte[,] gray)
+        private byte[,,] objectDetectionPipeline (byte[,] gray)
         {
             int w = gray.GetLength(0);
             int h = gray.GetLength(1);
@@ -873,9 +873,47 @@ namespace ImageApp
             //  answer.
             
             // Step 4: Visualize the answer in red.
+            byte[,,] visualized = new byte[w,h,3];
+            for(int x = 0; x<w; x++)
+            for(int y = 0; y<h; y++)
+            {
+                visualized[x,y,0] = output[x,y];
+                visualized[x,y,1] = output[x,y];
+                visualized[x,y,2] = output[x,y];
+            }
 
-            return output;
+            for(int r = 0; r < possible_outlets.Count; r++)
+            {
+                Circle outlet = possible_outlets[r].Item1;
+                Circle c1 = possible_outlets[r].Item2;
+                Circle c2 = possible_outlets[r].Item3;
+
+                visualiseCircle(visualized, outlet);
+                visualiseCircle(visualized, c1);
+                visualiseCircle(visualized, c2);
+            }    
+            return visualized;
         }// objectDetectionPipeline.
+
+        private void visualiseCircle(byte[,,] input, Circle circle)
+        {
+            int w = input.GetLength(0);
+		    int h = input.GetLength(1);
+            byte[,,] output = input; 
+            // Make the circle red in the output image.
+            int steps = Math.Max(8, (int)Math.Ceiling(2 * Math.PI * circle.r));
+            for (int s = 0; s < steps; s++)
+            {
+                double angle = 2 * Math.PI * s / steps;
+                int x = circle.x + (int)Math.Round(Math.Cos(angle) * circle.r);
+                int y = circle.y + (int)Math.Round(Math.Sin(angle) * circle.r);
+                if (x < 0 || x >= w || y < 0 || y >= h) continue;
+                output[x,y,0] = byte.MaxValue;
+				output[x,y,1] = 0;
+				output[x,y,2] = 0;
+            }
+            return;
+        }
 
         // Returns the distance between 2 circles. Return vlaue can be negative.
         private double circleDistance(int x1, int x2, int y1, int y2, int r1, int r2)
