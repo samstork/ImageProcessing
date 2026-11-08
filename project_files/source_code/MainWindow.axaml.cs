@@ -95,6 +95,7 @@ namespace ImageApp
             ObjectDetectionPipeline,
             CannyEdgeDetection,
             Downsample,
+            GammaCorrection,
         }
         
         private enum FilterOptions
@@ -763,6 +764,7 @@ namespace ImageApp
             byte thresholdValue = 100; // Sharpening threshold; higher = fewer contrasts get sharpened
             float sharpenValue = 0.5f; // Sharpening intensity; Stronger edges, but more noise
             int targetResolution = 800; // Maximum resolution in either axis. 
+            double gamma = 2.0;
 
             gray = Downsample(gray, targetResolution);
 
@@ -803,7 +805,7 @@ namespace ImageApp
             int maxRadius = Math.Max(h, w)/2;
             byte confidence_threshold = 140;
             Debug.WriteLine("Running Hough transformer");
-            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, false, minRadius, maxRadius, 0.2f);
+            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, true, minRadius, maxRadius, 0.2f);
 
             // Step 1: Find pairs of circles within the circle, pairs should have
             //  A similar size.
@@ -859,29 +861,31 @@ namespace ImageApp
             Debug.WriteLine($"Found {circles.Count} Circles");
             
             // Iterate over all circles and try to form pairs of potential plug holes.
-            // HEURISTIC determining the similarity of the holes
-            const float HEURISTIC = 0.90f; // Holes should be HEURISTIC*100 % similar
+            // HEURISTIC_A determining the similarity of the holes
+            const float HEURISTIC_A = 0.90f; // Holes should be HEURISTIC_A*100 % similar
+            const float HEURISTIC_B = 0.8f;
             List<(Circle ,Circle)>[] pairsArr = new List<(Circle,Circle)>[radiusInterval];
             Parallel.For(0, radiusInterval, r1 =>
             {
                 List<Circle> baseCircles = circleArr[r1];
                 List<(Circle ,Circle)> pairsThisRadius = new List<(Circle,Circle)>();
-                int maxR2 = Math.Min(radiusInterval - 1, (int)Math.Floor(r1 / HEURISTIC));
+                int maxR2 = Math.Min(radiusInterval - 1, (int)Math.Floor(r1 / HEURISTIC_A));
                 for (int r2 = r1; r2 <= maxR2; r2++)
                 {
                     List<Circle> partnerCircles = circleArr[r2];
-                    foreach(Circle baseCircle in baseCircles)
-                    foreach(Circle partnerCircle in partnerCircles)
-                    {
-                        int distanceX = baseCircle.x - partnerCircle.x, distanceY = baseCircle.y - partnerCircle.y;
-                        double distance = Math.Sqrt(distanceX * distanceX + distanceY * distanceY);
-                        float averageR = (baseCircle.r+partnerCircle.r)/2;
-                        float expectedD = 6*averageR;
-                        if (distance < (HEURISTIC*expectedD)) continue;
-                        if (distance > ((2f-HEURISTIC)*expectedD)) continue;
+                    foreach(Circle baseCircle in baseCircles){
+                        foreach(Circle partnerCircle in partnerCircles)
+                        {
+                            double distance = Distance(baseCircle.x, partnerCircle.x, baseCircle.y, partnerCircle.y);
+                            float averageR = (baseCircle.r+partnerCircle.r)/2;
+                            float expectedD = 8*averageR;
+                            Debug.WriteLine($"BC (r: {baseCircle.r} x: {baseCircle.x} y: {baseCircle.y}), PC (r: {partnerCircle.r} x: {partnerCircle.x} y: {partnerCircle.y}), Distance: {distance}, min: {HEURISTIC_A*expectedD}, max: {(2f-HEURISTIC_A)*expectedD}");
+                            if (distance < (HEURISTIC_B*expectedD)) continue;
+                            if (distance > ((2f-HEURISTIC_B)*expectedD)) continue;
 
-                        if (ReferenceEquals(baseCircle, partnerCircle)) continue;
-                        pairsThisRadius.Add((baseCircle, partnerCircle));
+                            if (ReferenceEquals(baseCircle, partnerCircle)) continue;
+                            pairsThisRadius.Add((baseCircle, partnerCircle));
+                        }
                     }
                 }
                 pairsArr[r1] = pairsThisRadius; 
@@ -907,19 +911,19 @@ namespace ImageApp
                 //  radius of the prong holes.
                 float averageR = (c1.r+c2.r)/2;
                 float expectedROutlet = averageR*8.0f;
-                int minOutletRad = (int)(expectedROutlet * HEURISTIC) - minRadius;
-                int maxOutletRad = Math.Min(radiusInterval, (int)(expectedROutlet / HEURISTIC) - minRadius);
-                float expectedDistance = 6f * averageR;
-                for (int i = minOutletRad; i < maxOutletRad; i ++)
+                int minOutletRad = (int)(expectedROutlet * HEURISTIC_A) - minRadius;
+                int maxOutletRad = Math.Min(radiusInterval, (int)(expectedROutlet / HEURISTIC_A) - minRadius);
+                Debug.WriteLine($"{minOutletRad}, {maxOutletRad}");
+                for (int i = 0; i < maxOutletRad; i ++)
                 {
                     foreach (Circle outlet in circleArr[i])
                     {
                         double distance1 = Distance(c1.x, outlet.x, c1.y, outlet.y);
                         double distance2 = Distance(c2.x, outlet.x, c2.y, outlet.y);
-                        Debug.WriteLine($"Distance 1: {outlet.r/HEURISTIC} < {distance1}");
-                        Debug.WriteLine($"Distance 2: {outlet.r/HEURISTIC} < {distance2}");
-                        if (Math.Abs(distance1) < outlet.r / HEURISTIC) continue;
-                        if (Math.Abs(distance2) < outlet.r / HEURISTIC) continue;
+                        Debug.WriteLine($"Distance 1: {outlet.r/HEURISTIC_A} < {distance1}");
+                        Debug.WriteLine($"Distance 2: {outlet.r/HEURISTIC_A} < {distance2}");
+                        if (Math.Abs(distance1) > outlet.r / HEURISTIC_A) continue;
+                        if (Math.Abs(distance2) > outlet.r / HEURISTIC_A) continue;
                         lock (x) {possibleOutlets.Add((outlet, c1, c2));}
                     }
                     
