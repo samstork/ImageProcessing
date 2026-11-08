@@ -743,6 +743,11 @@ namespace ImageApp
         // ====================================================================
 
         // TODO : Figure out best parameters for the preprocessing.
+        // Proportions of dutch electrical outlet:
+        // Radius of outlet: 2cm
+        // Radius of prong: 0.25cm
+        // Distance between outer perimeter of prongs: 1.5cm
+        // Distance from perimeter prong to outlet perimeter: 0.75cm
         private byte[,] objectDetectionPipeline (byte[,] gray)
         {
             int w = gray.GetLength(0);
@@ -781,53 +786,115 @@ namespace ImageApp
 
             // Run hough circles
             int minRadius = 10;
-            int maxRadius = 100;
+            int maxRadius = 200;
             byte confidence_threshold = 80;
             byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, false, minRadius, maxRadius);
 
             // Step 1: Find pairs of circles within the circle, pairs should have
             //  A similar size.
             // Start by finding circles
-            List<Circle> circles = new List<Circle>();
-            for (int radius = 0; radius < accumulators.Length; radius++)
+            byte[][,] peakAccumulators = new byte[accumulators.GetLength(0)][,];
+            for (int i = 0; i < accumulators.GetLength(0); i++)
             {
-                byte[,] accumulator = accumulators[radius];
-                int r = minRadius+radius;
-                int w2 = accumulator.GetLength(0);
-                int h2 = accumulator.GetLength(1);
-                // We will look for maxima 
-                for (int x = 1; x < w2-1; x++)
-                for (int y = 1; y < h2-1; y++)
+                byte[,] nms = HoughTransformer.NonMaxSuppression(accumulators[i], wrap: false);
+                int width = nms.GetLength(0);
+                int height = nms.GetLength(1);
+                peakAccumulators[i] = new byte[width, height];
+                for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
-                    // If the confidence value is not above threshold, dont add the circle.
-                    byte c = accumulator[x,y];
-                    if (c<confidence_threshold) continue;
-
-                    // Check whether or not the value is a local maximum.
-                    bool local_max = true;
-                    for (int i= -1; i <= 1; i++)
-                    for (int j= -1; j <= 1; j++)
-                    {
-                        if ((i==0)&&(j==0)) continue;
-                        if (accumulator[x+i,y+j]>c) local_max=false;
-                    }
-
-                    if (!local_max) continue;
-                    // Otherwise it is a circle that can be added to the list
-                    circles.Add(new Circle(x,y,r,c));
+                    if (nms[x, y] == 0 || nms[x, y] < confidence_threshold) continue;
+                    if (i > 0 && nms[x, y] <= accumulators[i - 1][x, y]) continue;
+                    if (i < accumulators.GetLength(0) - 1 && nms[x, y] < accumulators[i + 1][x, y]) continue;
+                    peakAccumulators[i][x, y] = byte.MaxValue;
                 }
             }
 
+            List<Circle> circles = new List<Circle>();
+            for (int r = 0; r<peakAccumulators.Length; r++)
+            {
+                byte[,] temp = peakAccumulators[r];
+                for (int x = 1; x < temp.GetLength(0)-1; x++)
+                for (int y = 1; y < temp.GetLength(1)-1; y++)
+                {
+                    if(temp[x,y]==255)
+                    {
+                        circles.Add(new Circle(x,y,(r+minRadius),temp[x,y]));
+                    }
+                }
+            }
+
+            // Iterate over all circles and try to form pairs of potential plug holes.
+            // HEURISTIC determining the similarity of the holes
+            const float HEURISTIC = 0.90f; // Holes should be HEURISTIC*100 % similar
+            List<(Circle ,Circle)> pairs = new List<(Circle,Circle)>();
+            for (int i = 0; i < circles.Count; i++)
+            for (int j = i+1; j < circles.Count; j++)
+            {
+                Circle c1 = circles[i];
+                Circle c2 = circles[j];
+                // The circles should have about the same radius.
+                float circle_ratio = (float)Math.Min(c1.r, c2.r) / Math.Max(c1.r, c2.r);
+                if (circle_ratio < HEURISTIC) continue;
+                // The circles should at be about 6*average(c1.r+c2.r) apart.
+                // double d = Math.Sqrt(Math.Pow((c1.x-c2.x), 2)+Math.Pow((c1.y-c2.y),2))-(c1.r+c2.r);
+                double d = circleDistance(c1.x,c2.x,c1.y,c2.y,c1.r,c2.r);
+                float average_r = (c1.r+c2.r)/2;
+                float expected_d = 6*average_r;
+                if (d < (HEURISTIC*expected_d)) continue;
+                if (d > ((2f-HEURISTIC)*expected_d)) continue;
+                pairs.Add((c1,c2));
+            }
+
+            // All potential pairs of circles should now have been found.
             // Step 2: Both circles should be contained within a big circle and be
-            //  some distance apart from the outer parameter. The big circle should
-            //  be around a specific ratio larger. The small holes also should be
-            //  on opposite sides of the big circle.
+            //  some distance (approximately 3*r of plughole) apart from the outer parameter. 
+            // The big circle should be around a specific ratio larger. 
+            // The small holes also should be on opposite sides of the big circle.
+            // possible_outlets holds all possible tuples of outlets in the following order;
+            //  Item1=outlet ; Item2=prong_hole_1 ; Item3=prong_hole_2.
+            List<(Circle,Circle,Circle)> possible_outlets = new List<(Circle,Circle,Circle)>();
+            for (int i = 0; i < pairs.Count; i++)
+            {
+                Circle c1 = pairs[i].Item1;
+                Circle c2 = pairs[i].Item2;
+                for (int j = 0; j < circles.Count; j++)
+                {
+                    Circle outlet = circles[j];
+                    // The radius of the outlet circle should be about 8 times the
+                    //  radius of the prong holes.
+                    float average_r = (c1.r+c2.r)/2;
+                    float expected_r_outlet = average_r*8.0f;
+                    if (expected_r_outlet<outlet.r*HEURISTIC) continue;
+                    if (expected_r_outlet>outlet.r*(2-HEURISTIC)) continue;
+
+                    // Distance from the outlet to the holes should be negative and
+                    //  be approximately 3*radius_of_prong_hole.
+                    double d1 = circleDistance(c1.x,outlet.x,c1.y,outlet.y,c1.r,outlet.r);
+                    double d2 = circleDistance(outlet.x,c2.x,outlet.y,c2.y,outlet.r,c2.r);
+                    if ((d1>=0)||(d2>=0)) continue;
+                    float expected_d = 3.0f*average_r;
+                    if (Math.Abs(d1) < (HEURISTIC*expected_d)) continue;
+                    if (Math.Abs(d1) > ((2f-HEURISTIC)*expected_d)) continue;
+                    if (Math.Abs(d2) < (HEURISTIC*expected_d)) continue;
+                    if (Math.Abs(d2) > ((2f-HEURISTIC)*expected_d)) continue;
+                    possible_outlets.Add((outlet,c1,c2));
+                }
+            }
+
             // Step 3: Rank the pairs (triplets?) by confidence and give a definitive
             //  answer.
+            
             // Step 4: Visualize the answer in red.
 
             return output;
         }// objectDetectionPipeline.
+
+        // Returns the distance between 2 circles. Return vlaue can be negative.
+        private double circleDistance(int x1, int x2, int y1, int y2, int r1, int r2)
+        {
+            return Math.Sqrt(Math.Pow((x1-x2), 2)+Math.Pow((y1-y2),2))-(r1+r2);
+        }
 
         private static byte[,] cannyEdgeDetection (byte[,] inputImage,
                                             float[,] horizontalKernel,
