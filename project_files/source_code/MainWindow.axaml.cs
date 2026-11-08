@@ -768,7 +768,7 @@ namespace ImageApp
             int targetResolution = 800; // Maximum resolution in either axis. 
             double gamma = 1.1;
 
-            gray = Downsample(gray, targetResolution);
+            byte[,] output = Downsample(gray, targetResolution);
 
             int w = gray.GetLength(0);
             int h = gray.GetLength(1);
@@ -781,7 +781,7 @@ namespace ImageApp
             // output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
             
             
-            byte[,] output = MedianFilter(gray, kernelSize);
+            output = MedianFilter(gray, kernelSize);
             output = AutoAdjustContrast(gray, 5, 95);
 
             // Make the whole image somewhat darker to make bright colours pop
