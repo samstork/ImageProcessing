@@ -724,6 +724,11 @@ namespace ImageApp
         // ====================================================================
 
         // TODO : Figure out best parameters for the preprocessing.
+        // Proportions of dutch electrical outlet:
+        // Radius of outlet: 2cm
+        // Radius of prong: 0.25cm
+        // Distance between outer perimeter of prongs: 1.5cm
+        // Distance from perimeter prong to outlet perimeter: 0.75cm
         private byte[,] objectDetectionPipeline (byte[,] gray)
         {
             int w = gray.GetLength(0);
@@ -800,12 +805,36 @@ namespace ImageApp
                 }
             }
 
+            // Iterate over all circles and try to form pairs of potential plug holes.
+            // HEURISTIC determining the similarity of the holes
+            const float HEURISTIC = 0.90f; // Holes should be HEURISTIC*100 % similar
+            List<(Circle ,Circle)> pairs = new List<(Circle,Circle)>();
+            for (int i = 0; i < circles.Count; i++)
+            for (int j = i+1; j < circles.Count; j++)
+            {
+                Circle c1 = circles[i];
+                Circle c2 = circles[j];
+                // The circles should have about the same radius.
+                float circle_ratio = (float)Math.Min(c1.r, c2.r) / Math.Max(c1.r, c2.r);
+                if (circle_ratio < HEURISTIC) continue;
+                // The circles should at be about 6*average(c1.r+c2.r) apart.
+                double d = Math.Sqrt(Math.Pow((c1.x-c2.x), 2)+Math.Pow((c1.y-c2.y),2))-(c1.r+c2.r);
+                float average_r = (c1.r+c2.r)/2;
+                float expected_d = 6*average_r;
+                if (d < (HEURISTIC*expected_d)) continue;
+                if (d > ((2f-HEURISTIC)*expected_d)) continue;
+                pairs.Add((c1,c2));
+            }
+
+            // All potential pairs of circles should now have been found.
             // Step 2: Both circles should be contained within a big circle and be
-            //  some distance apart from the outer parameter. The big circle should
-            //  be around a specific ratio larger. The small holes also should be
-            //  on opposite sides of the big circle.
+            //  some distance (approximately 3*r of plughole) apart from the outer parameter. 
+            // The big circle should be around a specific ratio larger. 
+            // The small holes also should be on opposite sides of the big circle.
+
             // Step 3: Rank the pairs (triplets?) by confidence and give a definitive
             //  answer.
+            
             // Step 4: Visualize the answer in red.
 
             return output;
