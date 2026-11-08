@@ -811,7 +811,6 @@ namespace ImageApp
             //  A similar size.
             // Start by finding circles
             byte[][,] peakAccumulators = new byte[accumulators.GetLength(0)][,];
-            bool isLocalMax = true;
             int radiusInterval = accumulators.GetLength(0);
             Parallel.For (0, radiusInterval, i =>
             {
@@ -823,7 +822,7 @@ namespace ImageApp
                 for (int y = 0; y < h; y++)
                 {
                     if (nms[x, y] == 0 || nms[x,y] < confidence_threshold) continue;
-                    isLocalMax = true;
+                    bool isLocalMax = true;
 
                     for (int j = 1; j >= -1; j-= 2)
                     {
@@ -862,7 +861,7 @@ namespace ImageApp
             
             // Iterate over all circles and try to form pairs of potential plug holes.
             // HEURISTIC determining the similarity of the holes
-            const float HEURISTIC = 0.90f; // Holes should be HEURISTIC*100 % similar
+            const float HEURISTIC = 0.80f; // Holes should be HEURISTIC*100 % similar
             List<(Circle ,Circle)>[] pairsArr = new List<(Circle,Circle)>[radiusInterval];
             Parallel.For(0, radiusInterval, r1 =>
             {
@@ -878,7 +877,7 @@ namespace ImageApp
                         int distanceX = baseCircle.x - partnerCircle.x, distanceY = baseCircle.y - partnerCircle.y;
                         double distance = Math.Sqrt(distanceX * distanceX + distanceY * distanceY);
                         float averageR = (baseCircle.r+partnerCircle.r)/2;
-                        float expectedD = 6*averageR;
+                        float expectedD = 8*averageR;
                         if (distance < (HEURISTIC*expectedD)) continue;
                         if (distance > ((2f-HEURISTIC)*expectedD)) continue;
 
