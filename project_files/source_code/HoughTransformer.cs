@@ -74,34 +74,32 @@ namespace ImageApp
 
 			int[][,] accumulator = new int[radiusInterval + 1][,];
 
-			int a, b, radius, k, vote;
-			for (int i = 0; i <= radiusInterval; i++)
-			{
-
-				accumulator[i] = new int[w,h];
-				radius = i + minRadius;
-				k = CircleSteps(radius);
-    			(int x, int y)[] offsets = new (int x, int y)[k];
-				for (int s = 0; s < k; s++)
+			Parallel.For(0, radiusInterval + 1, i =>
 				{
-					double angle = 2 * Math.PI * s / k;
-					offsets[s] = ((int)Math.Round(Math.Cos(angle) * radius), (int)Math.Round(Math.Sin(angle) * radius));
-				}
-				for (int x = 0; x<w; x++)
-				for (int y = 0; y<h; y++)
-				{
-					foreach ((int x, int y) offset in offsets)
+					int a, b, radius = i + minRadius, k = CircleSteps(radius), vote;
+					accumulator[i] = new int[w,h];
+					(int x, int y)[] offsets = new (int x, int y)[k];
+					for (int s = 0; s < k; s++)
 					{
-						a = x + offset.x;
-						b = y + offset.y;
-						if (0 <= a && a < w && 0 <= b && b < h && inputImage[a, b] != 0)
+						double angle = 2 * Math.PI * s / k;
+						offsets[s] = ((int)Math.Round(Math.Cos(angle) * radius), (int)Math.Round(Math.Sin(angle) * radius));
+					}
+					for (int x = 0; x<w; x++)
+					for (int y = 0; y<h; y++)
+					{
+						foreach ((int x, int y) offset in offsets)
 						{
-							vote = binary ? 1 : inputImage[a, b];
-							accumulator[i][x, y] += vote;
+							a = x + offset.x;
+							b = y + offset.y;
+							if (0 <= a && a < w && 0 <= b && b < h && inputImage[a, b] != 0)
+							{
+								vote = binary ? 1 : inputImage[a, b];
+								accumulator[i][x, y] += vote;
+							}
 						}
 					}
 				}
-			}
+			);
 
 			return NormCircleAccumulatorByRadius(accumulator, minRadius, binary, leniency);
 		}

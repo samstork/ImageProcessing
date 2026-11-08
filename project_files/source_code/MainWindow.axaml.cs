@@ -656,14 +656,14 @@ namespace ImageApp
                                             if (nms[x, y] == 0 || nms[x,y] < thresholdSValue) continue;
                                             isLocalMax = true;
 
-                                            for (int j = -1; j < 2; j+= 2)
+                                            for (int j = 1; j >= -1; j-= 2)
                                             {
                                                 if (i + j < 0 || i + j >= accumulators.Length) continue; 
                                                 for (int u = -1; u <= 1; u++)
                                                 for (int v = -1; v <= 1; v++)
                                                 {
                                                     if (x + u < 0 || x + u >= w || y + v < 0 || y + v >= h) continue;
-                                                    if (accumulators[i + j][x + u, y + v] >= nms[x, y]) isLocalMax = false;
+                                                    if (accumulators[i + j][x + u, y + v] + ((j + 1) / 2) >= nms[x, y]) isLocalMax = false;
                                                     if (!isLocalMax) break;
                                                 }
                                                 if (!isLocalMax) break;
