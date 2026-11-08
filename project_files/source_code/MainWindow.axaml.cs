@@ -762,40 +762,41 @@ namespace ImageApp
 
             // Run hough circles
             int minRadius = 10;
-            int maxRadius = 100;
+            int maxRadius = 200;
             byte confidence_threshold = 80;
             byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, false, minRadius, maxRadius);
 
             // Step 1: Find pairs of circles within the circle, pairs should have
             //  A similar size.
             // Start by finding circles
-            List<Circle> circles = new List<Circle>();
-            for (int radius = 0; radius < accumulators.Length; radius++)
+            byte[][,] peakAccumulators = new byte[accumulators.GetLength(0)][,];
+            for (int i = 0; i < accumulators.GetLength(0); i++)
             {
-                byte[,] accumulator = accumulators[radius];
-                int r = minRadius+radius;
-                int w2 = accumulator.GetLength(0);
-                int h2 = accumulator.GetLength(1);
-                // We will look for maxima 
-                for (int x = 1; x < w2-1; x++)
-                for (int y = 1; y < h2-1; y++)
+                byte[,] nms = HoughTransformer.NonMaxSuppression(accumulators[i], wrap: false);
+                int width = nms.GetLength(0);
+                int height = nms.GetLength(1);
+                peakAccumulators[i] = new byte[width, height];
+                for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
-                    // If the confidence value is not above threshold, dont add the circle.
-                    byte c = accumulator[x,y];
-                    if (c<confidence_threshold) continue;
+                    if (nms[x, y] == 0 || nms[x, y] < confidence_threshold) continue;
+                    if (i > 0 && nms[x, y] <= accumulators[i - 1][x, y]) continue;
+                    if (i < accumulators.GetLength(0) - 1 && nms[x, y] < accumulators[i + 1][x, y]) continue;
+                    peakAccumulators[i][x, y] = byte.MaxValue;
+                }
+            }
 
-                    // Check whether or not the value is a local maximum.
-                    bool local_max = true;
-                    for (int i= -1; i <= 1; i++)
-                    for (int j= -1; j <= 1; j++)
+            List<Circle> circles = new List<Circle>();
+            for (int r = 0; r<peakAccumulators.Length; r++)
+            {
+                byte[,] temp = peakAccumulators[r];
+                for (int x = 1; x < temp.GetLength(0)-1; x++)
+                for (int y = 1; y < temp.GetLength(1)-1; y++)
+                {
+                    if(temp[x,y]==255)
                     {
-                        if ((i==0)&&(j==0)) continue;
-                        if (accumulator[x+i,y+j]>c) local_max=false;
+                        circles.Add(new Circle(x,y,(r+minRadius),temp[x,y]));
                     }
-
-                    if (!local_max) continue;
-                    // Otherwise it is a circle that can be added to the list
-                    circles.Add(new Circle(x,y,r,c));
                 }
             }
 
