@@ -764,7 +764,7 @@ namespace ImageApp
             byte thresholdValue = 100; // Sharpening threshold; higher = fewer contrasts get sharpened
             float sharpenValue = 0.5f; // Sharpening intensity; Stronger edges, but more noise
             int targetResolution = 800; // Maximum resolution in either axis. 
-            double gamma = 1;
+            double gamma = 1.1;
 
             gray = Downsample(gray, targetResolution);
 
@@ -796,18 +796,21 @@ namespace ImageApp
 
 
             // Canny edge detection
-            output = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 230);
+            byte[,] outputEdge = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 230);
             Debug.WriteLine("Edges Detected");
 
             // -----------------------------------------------------------------
             // Recognizing the object.
 
             // Run hough circles
-            int minRadius = 3;
+            const int minRadius = 4;
             int maxRadius = Math.Max(h, w)/2;
-            byte confidence_threshold = 140;
+            byte confidence_threshold = 130;
+            const int MIN_HOLE_CONTRAST = 25;
+
+
             Debug.WriteLine("Running Hough transformer");
-            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, true, minRadius, maxRadius, 0.2f);
+            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(outputEdge, true, minRadius, maxRadius, 0.15f);
 
             // Step 1: Find pairs of circles within the circle, pairs should have
             //  A similar size.
@@ -873,12 +876,14 @@ namespace ImageApp
             Parallel.For(0, radiusInterval, r1 =>
             {
                 List<Circle> baseCircles = circleArr[r1];
+
                 List<(Circle, Circle, float confidence)> pairsThisRadius = new List<(Circle,Circle, float)>();
                 int maxR2 = Math.Min(radiusInterval - 1, (int)Math.Floor(r1 / HEURISTIC_A));
                 for (int r2 = r1; r2 <= maxR2; r2++)
                 {
                     List<Circle> partnerCircles = circleArr[r2];
                     foreach(Circle baseCircle in baseCircles){
+                        if (CheckCircleContrast(output, baseCircle, MIN_HOLE_CONTRAST)) continue;
                         foreach(Circle partnerCircle in partnerCircles)
                         {
                             double distance = Distance(baseCircle.x, partnerCircle.x, baseCircle.y, partnerCircle.y);
@@ -887,7 +892,7 @@ namespace ImageApp
                             Debug.WriteLine($"BC (r: {baseCircle.r} x: {baseCircle.x} y: {baseCircle.y}), PC (r: {partnerCircle.r} x: {partnerCircle.x} y: {partnerCircle.y}), Distance: {distance}, min: {HEURISTIC_A*expectedD}, max: {(2f-HEURISTIC_A)*expectedD}");
                             if (distance < (HEURISTIC_B*expectedD)) continue;
                             if (distance > ((2f-HEURISTIC_B)*expectedD)) continue;
-
+                            if (CheckCircleContrast(output, baseCircle, MIN_HOLE_CONTRAST)) continue;
                             if (ReferenceEquals(baseCircle, partnerCircle)) continue;
                             pairsThisRadius.Add((baseCircle, partnerCircle, (float)Math.Abs(distance - expectedD)/expectedD));
                         }
@@ -999,6 +1004,28 @@ namespace ImageApp
             }
 
             return output;
+        }
+
+        private static bool CheckCircleContrast(byte[,] inputImage, Circle circle, int minContrast = 25)
+        {
+            int w = inputImage.GetLength(0);
+            int h = inputImage.GetLength(1);
+            long innerSum = 0, outerSum = 0;
+
+            for (int i = -1; i < 1; i+=2)
+            for (int j = -1; j < 1; j+=2)
+            {
+                int innerX = circle.x + i, innerY = circle.y + j;
+                int outerX = circle.x + i * (3 + circle.r), outerY = circle.y + j * (3 + circle.r);
+
+                // Prune if too close to boarder
+                if (innerX < 0 || innerX >= w || innerY < 0 || innerY >= h) return false;
+                if (outerX < 0 || outerX >= w || outerY < 0 || outerY >= h) return false;
+                innerSum += inputImage[circle.x + i, circle.y + j]/4;
+                outerSum += inputImage[circle.x + i * (3 + circle.r), circle.y + j * (3 + circle.r)]/4;
+            }
+                return outerSum - innerSum >= minContrast;
+            
         }
 
         private void visualiseCircle(byte[,,] input, Circle circle)
