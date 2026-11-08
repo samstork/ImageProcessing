@@ -82,7 +82,7 @@ namespace ImageApp
 				radius = i + minRadius;
 				k = CircleSteps(radius);
     			(int x, int y)[] offsets = new (int x, int y)[k];
-				    for (int s = 0; s < k; s++)
+				for (int s = 0; s < k; s++)
 				{
 					double angle = 2 * Math.PI * s / k;
 					offsets[s] = ((int)Math.Round(Math.Cos(angle) * radius), (int)Math.Round(Math.Sin(angle) * radius));
@@ -171,6 +171,7 @@ namespace ImageApp
 			byte[][,] normedAccumulators = new byte[circleAccumulators.Length][,];
 			int w = circleAccumulators[0].GetLength(0);
 			int h = circleAccumulators[0].GetLength(1);
+
 			for (int i = 0; i < circleAccumulators.Length; i++)
 			{
 				double maxCircleValue = CircleSteps(i + minRadius) * (binary ? 1 : byte.MaxValue);

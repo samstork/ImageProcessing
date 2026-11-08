@@ -10,6 +10,7 @@ using Avalonia.Input;
 
 namespace ImageApp
 {
+
     public partial class MainWindow : Window
     {
         private WriteableBitmap? _loadedBitmap; // the raw loaded image, kept in color, for display in OriginalImage
@@ -18,6 +19,21 @@ namespace ImageApp
 
         object? _processedResult; // Processed grayscale values (nullable)
         private byte[,]? _processedResultRef; // Processed grayscale values (nullable)
+
+        public class Circle
+        {
+            public int x;
+            public int y;
+            public int r;// Radius
+            public int c;// Confidence
+            public Circle(int x_pos, int y_pos, int radius, byte confidence)
+            {
+                this.x = x_pos;
+                this.y = y_pos;
+                this.r = radius;
+                this.c = confidence;
+            }
+        }
 
 
         // Simple fixed defaults used by the functions below until you add your own
@@ -727,20 +743,67 @@ namespace ImageApp
 
             // TODO : Maybe run the image through edge sharpening?
             byte[,] mask =  ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
-            output = Sharpen(gray, mask, thresholdValue, sharpenValue);
+            output = Sharpen(output, mask, thresholdValue, sharpenValue);
 
             // TODO : Determine for what percentages it works best.
             // Adjust the contrast such that the object is easier to pick out.
-            output = AutoAdjustContrast(gray, 5, 95);
+            output = AutoAdjustContrast(output, 5, 95);
 
             // Run the image through Edge detection
-            output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
+            // output = EdgeMagnitude(output, _horizontalKernel, _verticalKernel);
 
             // Canny edge detection
-            // output = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 150);
+            output = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 150);
 
             // -----------------------------------------------------------------
             // Recognizing the object.
+
+            // Run hough circles
+            int minRadius = 10;
+            int maxRadius = 100;
+            byte confidence_threshold = 80;
+            byte[][,] accumulators = HoughTransformer.HoughCircleTransform(output, false, minRadius, maxRadius);
+
+            // Step 1: Find pairs of circles within the circle, pairs should have
+            //  A similar size.
+            // Start by finding circles
+            List<Circle> circles = new List<Circle>();
+            for (int radius = 0; radius < accumulators.Length; radius++)
+            {
+                byte[,] accumulator = accumulators[radius];
+                int r = minRadius+radius;
+                int w2 = accumulator.GetLength(0);
+                int h2 = accumulator.GetLength(1);
+                // We will look for maxima 
+                for (int x = 1; x < w2-1; x++)
+                for (int y = 1; y < h2-1; y++)
+                {
+                    // If the confidence value is not above threshold, dont add the circle.
+                    byte c = accumulator[x,y];
+                    if (c<confidence_threshold) continue;
+
+                    // Check whether or not the value is a local maximum.
+                    bool local_max = true;
+                    for (int i= -1; i <= 1; i++)
+                    for (int j= -1; j <= 1; j++)
+                    {
+                        if ((i==0)&&(j==0)) continue;
+                        if (accumulator[x+i,y+j]>c) local_max=false;
+                    }
+
+                    if (!local_max) continue;
+                    // Otherwise it is a circle that can be added to the list
+                    circles.Add(new Circle(x,y,r,c));
+                }
+            }
+
+            // Step 2: Both circles should be contained within a big circle and be
+            //  some distance apart from the outer parameter. The big circle should
+            //  be around a specific ratio larger. The small holes also should be
+            //  on opposite sides of the big circle.
+            // Step 3: Rank the pairs (triplets?) by confidence and give a definitive
+            //  answer.
+            // Step 4: Visualize the answer in red.
 
             return output;
         }// objectDetectionPipeline.
@@ -817,7 +880,7 @@ namespace ImageApp
                 }
             }
 
-            // Eight-connected neighborhood
+            // Eight neighborhood
             int[] dx = { -1, -1, -1, 0, 0, 1, 1, 1 };
             int[] dy = { -1, 0, 1, -1, 1, -1, 0, 1 };
 
