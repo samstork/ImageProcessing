@@ -643,6 +643,7 @@ namespace ImageApp
                                     int maxRadius = thresholdTValue;
                                     byte[][,] accumulators = HoughTransformer.HoughCircleTransform(gray, binary, minRadius, maxRadius, sigmaValue);
                                     byte[][,] peakAccumulators = new byte[accumulators.GetLength(0)][,];
+                                    bool isLocalMax = true;
                                     for (int i = 0; i < accumulators.GetLength(0); i++)
                                     {
                                         byte[,] nms = HoughTransformer.NonMaxSuppression(accumulators[i], wrap: false);
@@ -652,10 +653,22 @@ namespace ImageApp
                                         for (int x = 0; x < w; x++)
                                         for (int y = 0; y < h; y++)
                                         {
-                                            if (nms[x, y] == 0 || nms[x, y] < thresholdSValue) continue;
-                                            if (i > 0 && nms[x, y] <= accumulators[i - 1][x, y]) continue;
-                                            if (i < accumulators.GetLength(0) - 1 && nms[x, y] < accumulators[i + 1][x, y]) continue;
-                                            peakAccumulators[i][x, y] = byte.MaxValue;
+                                            if (nms[x, y] == 0 || nms[x,y] < thresholdSValue) continue;
+                                            isLocalMax = true;
+
+                                            for (int j = -1; j < 2; j+= 2)
+                                            {
+                                                if (i + j < 0 || i + j >= accumulators.Length) continue; 
+                                                for (int u = -1; u <= 1; u++)
+                                                for (int v = -1; v <= 1; v++)
+                                                {
+                                                    if (x + u < 0 || x + u >= w || y + v < 0 || y + v >= h) continue;
+                                                    if (accumulators[i + j][x + u, y + v] >= nms[x, y]) isLocalMax = false;
+                                                    if (!isLocalMax) break;
+                                                }
+                                                if (!isLocalMax) break;
+                                            }
+                                            if (isLocalMax) peakAccumulators[i][x, y] = byte.MaxValue;
                                         }
                                     }
 
