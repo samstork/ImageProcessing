@@ -67,7 +67,7 @@ namespace ImageApp
 			return accumulator;
 		}
 
-		public static byte[][,] HoughCircleTransform(byte[,] inputImage, bool binary, int minRadius, int maxRadius) {
+		public static byte[][,] HoughCircleTransform(byte[,] inputImage, bool binary, int minRadius, int maxRadius, float leniency = 0.15f) {
 			int w = inputImage.GetLength(0);
 			int h = inputImage.GetLength(1);
 			int radiusInterval = maxRadius - minRadius;
@@ -90,19 +90,20 @@ namespace ImageApp
 				for (int x = 0; x<w; x++)
 				for (int y = 0; y<h; y++)
 				{
-					if (inputImage[x, y] == 0) continue;
-					vote = binary ? 1 : inputImage[x, y];
 					foreach ((int x, int y) offset in offsets)
 					{
-						a = x - offset.x;
-						b = y - offset.y;
-						if (0 <= a && a < w && 0 <= b && b < h) accumulator[i][a, b] += vote;
+						a = x + offset.x;
+						b = y + offset.y;
+						if (0 <= a && a < w && 0 <= b && b < h && inputImage[a, b] != 0)
+						{
+							vote = binary ? 1 : inputImage[a, b];
+							accumulator[i][x, y] += vote;
+						}
 					}
-
 				}
 			}
 
-			return NormCircleAccumulatorByRadius(accumulator, minRadius, binary);
+			return NormCircleAccumulatorByRadius(accumulator, minRadius, binary, leniency);
 		}
 
 
@@ -166,7 +167,7 @@ namespace ImageApp
 			return output;
 		}
 
-		public static byte[][,] NormCircleAccumulatorByRadius(int[][,] circleAccumulators, int minRadius, bool binary)
+		public static byte[][,] NormCircleAccumulatorByRadius(int[][,] circleAccumulators, int minRadius, bool binary, float leniency = 0.15f)
 		{
 			byte[][,] normedAccumulators = new byte[circleAccumulators.Length][,];
 			int w = circleAccumulators[0].GetLength(0);
@@ -174,8 +175,9 @@ namespace ImageApp
 
 			for (int i = 0; i < circleAccumulators.Length; i++)
 			{
-				double maxCircleValue = CircleSteps(i + minRadius) * (binary ? 1 : byte.MaxValue);
-
+				int steps = CircleSteps(i + minRadius);
+				double maxCircleValue = steps * Math.Pow(steps / (double)CircleSteps(minRadius * 2), -leniency)
+                    	* (binary ? 1 : byte.MaxValue);
 				normedAccumulators[i] = new byte[w, h];
 				for (int x = 0; x < w; x++)
 				for (int y = 0; y < h; y++)
