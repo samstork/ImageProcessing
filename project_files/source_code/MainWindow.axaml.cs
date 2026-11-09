@@ -781,13 +781,12 @@ namespace ImageApp
             // output = ConvolveImage(gray, CreateGaussianFilter(kernelSize, sigmaValue));
             
             
-            output = MedianFilter(gray, kernelSize);
-            output = AutoAdjustContrast(gray, 5, 95);
+            output = MedianFilter(output, kernelSize);
+            output = AutoAdjustContrast(output, 5, 95);
 
             // Make the whole image somewhat darker to make bright colours pop
             
             output = GammaCorrection(output, gamma);
-
             // TODO : Maybe run the image through edge sharpening?
             // byte[,] mask =  ConvolveImage(output_gamma, CreateGaussianFilter(kernelSize, sigmaValue));
             // output = Sharpen(output_gamma, mask, thresholdValue, sharpenValue);
@@ -802,19 +801,19 @@ namespace ImageApp
 
             // Canny edge detection
             byte[,] outputEdge = cannyEdgeDetection(output, _horizontalKernel, _verticalKernel, 50, 230);
-            Debug.WriteLine("Edges Detected");
+            //Debug.WriteLine("Edges Detected");
 
             // -----------------------------------------------------------------
             // Recognizing the object.
 
             // Run hough circles
             const int minRadius = 4;
-            int maxRadius = Math.Max(h, w)/2;
+            int maxRadius = Math.Min(h, w)/2;
             byte confidence_threshold = 130;
             const int MIN_HOLE_CONTRAST = 25;
 
 
-            Debug.WriteLine("Running Hough transformer");
+            //Debug.WriteLine("Running Hough transformer");
             byte[][,] accumulators = HoughTransformer.HoughCircleTransform(outputEdge, true, minRadius, maxRadius, 0.15f);
 
             // Step 1: Find pairs of circles within the circle, pairs should have
@@ -870,7 +869,7 @@ namespace ImageApp
             });
             List<Circle> circles = [.. circleArr.SelectMany(l => l)];
 
-            Debug.WriteLine($"Found {circles.Count} Circles");
+            //Debug.WriteLine($"Found {circles.Count} Circles");
             
             // Iterate over all circles and try to form pairs of potential plug holes.
             // HEURISTIC_A determining the similarity of the holes
@@ -893,10 +892,10 @@ namespace ImageApp
                             double distance = Distance(baseCircle.x, partnerCircle.x, baseCircle.y, partnerCircle.y);
                             float averageR = (baseCircle.r+partnerCircle.r)/2;
                             float expectedD = 8*averageR;
-                            Debug.WriteLine($"BC (r: {baseCircle.r} x: {baseCircle.x} y: {baseCircle.y}), PC (r: {partnerCircle.r} x: {partnerCircle.x} y: {partnerCircle.y}), Distance: {distance}, min: {HEURISTIC_A*expectedD}, max: {(2f-HEURISTIC_A)*expectedD}");
+                            //Debug.WriteLine($"BC (r: {baseCircle.r} x: {baseCircle.x} y: {baseCircle.y}), PC (r: {partnerCircle.r} x: {partnerCircle.x} y: {partnerCircle.y}), Distance: {distance}, min: {HEURISTIC_A*expectedD}, max: {(2f-HEURISTIC_A)*expectedD}");
                             if (distance < (HEURISTIC_B*expectedD)) continue;
                             if (distance > ((2f-HEURISTIC_B)*expectedD)) continue;
-                            if (CheckCircleContrast(output, baseCircle, MIN_HOLE_CONTRAST)) continue;
+                            if (CheckCircleContrast(output, partnerCircle, MIN_HOLE_CONTRAST)) continue;
                             if (ReferenceEquals(baseCircle, partnerCircle)) continue;
                             pairsThisRadius.Add((baseCircle, partnerCircle, (float)Math.Abs(distance - expectedD)/expectedD));
                         }
@@ -905,7 +904,7 @@ namespace ImageApp
                 pairsArr[r1] = pairsThisRadius; 
             });
             List<(Circle, Circle, float)> pairs = [.. pairsArr.SelectMany(l => l)];
-            Debug.WriteLine($"Found {pairs.Count} Circle Pairs");
+            //Debug.WriteLine($"Found {pairs.Count} Circle Pairs");
             // List<Circle> circles = [.. circleArr.SelectMany(l => l)];
             // All potential pairs of circles should now have been found.
             // Step 2: Both circles should be contained within a big circle and be
@@ -928,15 +927,15 @@ namespace ImageApp
                 float expectedROutlet = averageR*8.0f;
                 int minOutletRad = (int)(expectedROutlet * HEURISTIC_B) - minRadius;
                 int maxOutletRad = Math.Min(radiusInterval, (int)(expectedROutlet / HEURISTIC_B) - minRadius);
-                Debug.WriteLine($"{minOutletRad}, {maxOutletRad}");
+                //Debug.WriteLine($"{minOutletRad}, {maxOutletRad}");
                 for (int i = minOutletRad; i < maxOutletRad; i ++)
                 {
                     foreach (Circle outlet in circleArr[i])
                     {
                         double distance1 = Distance(c1.x, outlet.x, c1.y, outlet.y);
                         double distance2 = Distance(c2.x, outlet.x, c2.y, outlet.y);
-                        Debug.WriteLine($"Distance 1: {outlet.r/HEURISTIC_B} < {distance1}");
-                        Debug.WriteLine($"Distance 2: {outlet.r/HEURISTIC_B} < {distance2}");
+                        //Debug.WriteLine($"Distance 1: {outlet.r/HEURISTIC_B} < {distance1}");
+                        //Debug.WriteLine($"Distance 2: {outlet.r/HEURISTIC_B} < {distance2}");
                         if (Math.Abs(distance1) > outlet.r / HEURISTIC_B) continue;
                         if (Math.Abs(distance2) > outlet.r / HEURISTIC_B) continue;
                         lock (x) {possibleOutlets.Add((outlet, c1, c2, 0.5f * confidence + 0.5f * Math.Abs(outlet.r - expectedROutlet)/expectedROutlet));}
@@ -944,7 +943,7 @@ namespace ImageApp
                     
                 }
             });
-            Debug.WriteLine($"Found {possibleOutlets.Count} Potential outlets");
+            //Debug.WriteLine($"Found {possibleOutlets.Count} Potential outlets");
             List<(Circle outerCircle, Circle baseCircle, Circle partnerCircle, float confidence)> sortedOutlets = [.. possibleOutlets.OrderByDescending(o => o.confidence)];
             var outputOutlets = new List<(Circle outerCircle, Circle baseCircle, Circle partnerCircle, float confidence)>();
             foreach (var outlet in sortedOutlets)
@@ -1869,7 +1868,7 @@ namespace ImageApp
                 } else {
                     output[x, y] = inputImage[x,y];
                 } 
-                // Debug.WriteLine("Input: {0}, Mask: {1}, Output: {2}", inputImage[x,y], mask[x,y], result);
+                // //Debug.WriteLine("Input: {0}, Mask: {1}, Output: {2}", inputImage[x,y], mask[x,y], result);
             }
             return output;
         }
@@ -1944,8 +1943,8 @@ namespace ImageApp
             for(int i = 0; i<=255; i++)
             {
                 cumulativeRef += histRef[i].Count * inputCoefficient;
-                Debug.WriteLine(cumulativeRef);
-                Debug.WriteLine(cumulative);
+                //Debug.WriteLine(cumulativeRef);
+                //Debug.WriteLine(cumulative);
 
                 while (j < 256)
                 {
